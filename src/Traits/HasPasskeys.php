@@ -1,9 +1,9 @@
 <?php
 
-namespace Thomyris\LaravelPasskey\Traits;
+namespace Xefi\LaravelPasskey\Traits;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Thomyris\LaravelPasskey\Models\Passkey;
+use Xefi\LaravelPasskey\Models\Passkey;
 
 trait HasPasskeys
 {

@@ -1,6 +1,6 @@
 <?php
 
-namespace Thomyris\LaravelPasskey;
+namespace Xefi\LaravelPasskey;
 
 use Illuminate\Support\ServiceProvider;
 
@@ -11,9 +11,9 @@ class PasskeyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Merge package configuration
         $this->mergeConfigFrom(
-            __DIR__.'/../config/passkey.php', 'passkey'
+            __DIR__ . '/../config/passkey.php',
+            'passkey'
         );
     }
 
@@ -22,20 +22,15 @@ class PasskeyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Publish configuration
         $this->publishes([
-            __DIR__.'/../config/passkey.php' => config_path('passkey.php'),
+            __DIR__ . '/../config/passkey.php' => config_path('passkey.php'),
         ], 'passkey-config');
-
-        // Publish migrations
         $this->publishes([
-            __DIR__.'/../database/migrations' => database_path('migrations'),
+            __DIR__ . '/../database/migrations' => database_path('migrations'),
         ], 'passkey-migrations');
 
-        // Load migrations
-        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
-        // Load routes
-        $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
+        $this->loadRoutesFrom(__DIR__ . '/../routes/api.php');
     }
 }

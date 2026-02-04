@@ -1,6 +1,6 @@
 <?php
 
-namespace Thomyris\LaravelPasskey\Models;
+namespace Xefi\LaravelPasskey\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

@@ -1,0 +1,191 @@
+<?php
+
+namespace Xefi\LaravelPasskey\Http\Controllers;
+
+use Illuminate\Http\JsonResponse;
+use Illuminate\Routing\Controller;
+
+use Xefi\LaravelPasskey\Models\Passkey;
+use Xefi\LaravelPasskey\Services\WebAuthnService;
+use Xefi\LaravelPasskey\Http\Requests\IndexRequest;
+use Xefi\LaravelPasskey\Http\Requests\VerifyRequest;
+use Xefi\LaravelPasskey\Http\Requests\RegisterRequest;
+use Xefi\LaravelPasskey\Http\Requests\VerifyOptionsRequest;
+use Xefi\LaravelPasskey\Http\Requests\RegisterOptionsRequest;
+
+class PasskeyController extends Controller
+{
+    private WebAuthnService $webAuthnService;
+
+    public function __construct(WebAuthnService $webAuthnService)
+    {
+        $this->webAuthnService = $webAuthnService;
+    }
+    /**
+     * Get a list of passkeys for the authenticated user.
+     *
+     * @param IndexRequest $request
+     * @return JsonResponse
+     */
+    public function index(IndexRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unauthenticated',
+            ], 401);
+        }
+
+        $passkeys = Passkey::where('user_id', $user->id)
+            ->get(['id', 'user_id', 'label', 'credential_id', 'created_at']);
+
+        return response()->json($passkeys);
+    }
+
+    /**
+     * Get registration options for creating a new passkey.
+     *
+     * @param RegisterOptionsRequest $request
+     * @return JsonResponse
+     */
+    public function registerOptions(RegisterOptionsRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unauthenticated',
+            ], 401);
+        }
+
+        $validated = $request->validated();
+
+        $options = $this->webAuthnService->generate_register_options(
+            $validated['app_name'],
+            $validated['app_url'],
+            (string) $user->id,
+            $user->email,
+            $user->name
+        );
+
+        return response()->json($options);
+    }
+
+    /**
+     * Register a new passkey.
+     *
+     * @param RegisterRequest $request
+     * @return JsonResponse
+     */
+    public function register(RegisterRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+
+        $passkey = $this->webAuthnService->registerPasskey(
+            $validated,
+            $request->user()->id
+        );
+
+        return response()->json([
+            'message' => 'Passkey registered successfully',
+            'passkey' => [
+                'id' => $passkey->id,
+                'label' => $passkey->label,
+                'credential_id' => $passkey->credential_id,
+                'created_at' => $passkey->created_at,
+            ],
+        ]);
+    }
+
+    /**
+     * Get verification options for authenticating with a passkey.
+     *
+     * @param VerifyOptionsRequest $request
+     * @return JsonResponse
+     */
+    public function verifyOptions(VerifyOptionsRequest $request): JsonResponse
+    {
+        $challenge = $this->webAuthnService->generate_challenge();
+
+        $passkeys = Passkey::where('user_id', 1)->get(['credential_id']);
+
+        if ($passkeys->isEmpty()) {
+            return response()->json([
+                'message' => 'No passkeys found for this user',
+            ], 404);
+        }
+
+        $allowCredentials = $passkeys->map(function ($passkey) {
+            return [
+                'id' => $passkey->credential_id,
+                'type' => 'public-key',
+            ];
+        })->toArray();
+
+        return response()->json([
+            'challenge' => $challenge,
+            'allowCredentials' => $allowCredentials,
+            'timeout' => 600000,
+            'userVerification' => 'preferred',
+        ]);
+    }
+
+    /**
+     * Verify a passkey authentication attempt.
+     *
+     * @param VerifyRequest $request
+     * @return JsonResponse
+     */
+    public function verify(VerifyRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+
+        $passkey = $this->webAuthnService->verifyPasskey(
+            $validated['id'],
+            $validated['response']
+        );
+
+        return response()->json([
+            'message' => 'Passkey verification successful',
+            'user_id' => $passkey->user_id,
+            'passkey_id' => $passkey->id,
+        ]);
+    }
+
+    /**
+     * Authenticate a user with a passkey and create a session.
+     *
+     * @param VerifyRequest $request
+     * @return JsonResponse
+     */
+    public function auth(VerifyRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+
+        $passkey = $this->webAuthnService->verifyPasskey(
+            $validated['id'],
+            $validated['response']
+        );
+
+        $user = $passkey->user;
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'User not found',
+            ], 404);
+        }
+
+        $token = $user->createToken('passkey-auth')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Authentication successful',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ],
+            'token' => $token,
+        ]);
+    }
+}

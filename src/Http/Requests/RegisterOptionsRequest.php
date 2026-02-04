@@ -1,6 +1,6 @@
 <?php
 
-namespace Thomyris\LaravelPasskey\Http\Requests;
+namespace Xefi\LaravelPasskey\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 

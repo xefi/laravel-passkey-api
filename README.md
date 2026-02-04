@@ -16,7 +16,7 @@ A Laravel package for passkey (WebAuthn) authentication.
 Install the package via Composer:
 
 ```bash
-composer require thomyris/laravel-passkey
+composer require Xefi/laravel-passkey
 ```
 
 The package will automatically register its service provider through Laravel's package auto-discovery.
@@ -50,7 +50,7 @@ This creates `config/passkey.php` where you can customize:
 Add the `HasPasskeys` trait to your User model:
 
 ```php
-use Thomyris\LaravelPasskey\Traits\HasPasskeys;
+use Xefi\LaravelPasskey\Traits\HasPasskeys;
 
 class User extends Authenticatable
 {

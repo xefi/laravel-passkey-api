@@ -1,13 +1,13 @@
 {
-    "name": "thomyris/laravel-passkey",
-    "description": "A Laravel package for passkey authentication",
+    "name": "xefi/laravel-passkey-api",
+    "description": "A Laravel package for passkey authentication apis",
     "type": "library",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "license": "MIT",
     "authors": [
         {
-            "name": "Thomyris",
-            "email": "contact@thomyris.com"
+            "name": "Xefi",
+            "email": "contact@xefi.com"
         }
     ],
     "require": {
@@ -23,18 +23,18 @@
     },
     "autoload": {
         "psr-4": {
-            "Thomyris\\LaravelPasskey\\": "src/"
+            "Xefi\\LaravelPasskey\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Thomyris\\LaravelPasskey\\Tests\\": "tests/"
+            "Xefi\\LaravelPasskey\\Tests\\": "tests/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Thomyris\\LaravelPasskey\\PasskeyServiceProvider"
+                "Xefi\\LaravelPasskey\\PasskeyServiceProvider"
             ]
         }
     },
