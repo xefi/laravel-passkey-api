@@ -104,25 +104,23 @@ class PasskeyController extends Controller
      */
     public function verifyOptions(VerifyOptionsRequest $request): JsonResponse
     {
-        $challenge = $this->webAuthnService->generate_challenge();
+        $validated = $request->validated();
 
-        $passkeys = Passkey::where('user_id', 1)->get(['credential_id']);
+        $passkey = Passkey::where('credential_id', $validated['credential_id'])->first();
 
-        if ($passkeys->isEmpty()) {
-            throw new ModelNotFoundException('No passkeys found for this user');
+        if (!$passkey) {
+            throw new ModelNotFoundException('Passkey not found');
         }
 
-        $allowCredentials = $passkeys->map(function ($passkey) {
-            return [
-                'id' => $passkey->credential_id,
-                'type' => 'public-key',
-            ];
-        })->toArray();
-
         return response()->json([
-            'challenge' => $challenge,
-            'allowCredentials' => $allowCredentials,
-            'timeout' => 600000,
+            'challenge' => $passkey->challenge,
+            'allowCredentials' => [
+                [
+                    'id' => $passkey->credential_id,
+                    'type' => 'public-key',
+                ]
+            ],
+            'timeout' => config('passkey.timeout'),
             'userVerification' => 'preferred',
         ]);
     }

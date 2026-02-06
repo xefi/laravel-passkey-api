@@ -13,6 +13,8 @@ class VerifyOptionsRequest extends FormRequest
 
     public function rules(): array
     {
-        return [];
+        return [
+            'credential_id' => 'required|string',
+        ];
     }
 }
