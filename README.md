@@ -16,7 +16,7 @@ A Laravel package for passkey (WebAuthn) authentication.
 Install the package via Composer:
 
 ```bash
-composer require Xefi/laravel-passkey
+composer require xefi/laravel-passkey
 ```
 
 The package will automatically register its service provider through Laravel's package auto-discovery.

@@ -6,9 +6,70 @@ use Xefi\LaravelPasskey\Models\Passkey;
 
 /**
  * WebAuthn service for handling passkey operations.
+ * 
+ * This service implements the Web Authentication API (WebAuthn) specification for creating
+ * and using public-key-based credentials (passkeys) to authenticate users on web applications.
+ * 
+ * Standards and Specifications:
+ * 
+ * - W3C Web Authentication (WebAuthn) Level 2
+ *   https://www.w3.org/TR/webauthn-2/
+ *   Main specification defining the JavaScript API for creating and using public-key credentials
+ * 
+ * - FIDO2 Project
+ *   https://fidoalliance.org/fido2/
+ *   Collaborative project between FIDO Alliance and W3C encompassing WebAuthn and CTAP
+ * 
+ * - Client to Authenticator Protocol (CTAP)
+ *   https://fidoalliance.org/specs/fido-v2.0-ps-20190130/fido-client-to-authenticator-protocol-v2.0-ps-20190130.html
+ *   Defines communication between client (browser/OS) and authenticator (security key, biometrics)
+ * 
+ * - RFC 8809 - Registries for Web Authentication (WebAuthn)
+ *   https://www.rfc-editor.org/rfc/rfc8809.html
+ *   IANA registries for attestation statement format identifiers and extension identifiers
+ * 
+ * - COSE (CBOR Object Signing and Encryption)
+ *   RFC 8152: https://www.rfc-editor.org/rfc/rfc8152.html
+ *   Defines algorithm identifiers and key formats used in WebAuthn
+ * 
+ * Note: "Passkey" is a marketing term for a WebAuthn credential conforming to FIDO2 standards,
+ * not an independent specification.
+ * 
+ * @package Xefi\LaravelPasskey\Services
  */
 final class WebAuthnService
 {
+    /**
+     * COSE algorithm identifier for ES256 (ECDSA with P-256 and SHA-256)
+     */
+    private const COSE_ALG_ES256 = -7;
+
+    /**
+     * COSE algorithm identifier for RS256 (RSASSA-PKCS1-v1_5 with SHA-256)
+     */
+    private const COSE_ALG_RS256 = -257;
+
+    /**
+     * Generate registration options for creating a new passkey.
+     * 
+     * Creates the PublicKeyCredentialCreationOptions object required by the
+     * navigator.credentials.create() JavaScript API.
+     * 
+     * References:
+     * - WebAuthn Level 2 § 5.4: Options for Credential Creation
+     *   https://www.w3.org/TR/webauthn-2/#dictdef-publickeycredentialcreationoptions
+     * - WebAuthn Level 2 § 6.4.1: Register a New Credential
+     *   https://www.w3.org/TR/webauthn-2/#sctn-registering-a-new-credential
+     * - COSE Algorithm Identifiers (RFC 8152 § 8.1)
+     *   https://www.rfc-editor.org/rfc/rfc8152.html#section-8.1
+     * 
+     * @param string $app_name Relying Party name (displayed to user)
+     * @param string $app_url Relying Party URL (used to extract RP ID)
+     * @param string $user_id User identifier (converted to binary)
+     * @param string $email User email (used as username)
+     * @param string $display_name User display name
+     * @return array PublicKeyCredentialCreationOptions structure
+     */
     public function generate_register_options(
         string $app_name,
         string $app_url,
@@ -30,8 +91,8 @@ final class WebAuthnService
                 'displayName' => $display_name,
             ],
             'pubKeyCredParams' => [
-                ['type' => 'public-key', 'alg' => -7],
-                ['type' => 'public-key', 'alg' => -257],
+                ['type' => 'public-key', 'alg' => self::COSE_ALG_ES256],
+                ['type' => 'public-key', 'alg' => self::COSE_ALG_RS256],
             ],
             'timeout' => config('passkey.timeout', 600000),
             'attestation' => 'none',
@@ -42,6 +103,22 @@ final class WebAuthnService
         ];
     }
 
+    /**
+     * Generate authentication options for verifying an existing passkey.
+     * 
+     * Creates the PublicKeyCredentialRequestOptions object required by the
+     * navigator.credentials.get() JavaScript API.
+     * 
+     * References:
+     * - WebAuthn Level 2 § 5.5: Options for Assertion Generation
+     *   https://www.w3.org/TR/webauthn-2/#dictdef-publickeycredentialrequestoptions
+     * - WebAuthn Level 2 § 6.4.3: Verifying an Authentication Assertion
+     *   https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion
+     * 
+     * @param string $challenge Base64url-encoded challenge
+     * @param string $credential_id Base64-encoded credential identifier
+     * @return array PublicKeyCredentialRequestOptions structure
+     */
     public function generate_verify_options(string $challenge, string $credential_id): array
     {
         return [
@@ -57,15 +134,40 @@ final class WebAuthnService
         ];
     }
 
+    /**
+     * Extract credential data from registration response.
+     * 
+     * Parses the attestation object and extracts the credential ID and public key
+     * from the authenticator data. Uses CBOR decoding as specified in WebAuthn.
+     * 
+     * References:
+     * - WebAuthn Level 2 § 6.5.1: Attestation Object
+     *   https://www.w3.org/TR/webauthn-2/#sctn-attestation
+     * - WebAuthn Level 2 § 6.5.4: Authenticator Data
+     *   https://www.w3.org/TR/webauthn-2/#sctn-authenticator-data
+     * - CBOR (RFC 8949): Concise Binary Object Representation
+     *   https://www.rfc-editor.org/rfc/rfc8949.html
+     * - COSE Key Format (RFC 8152 § 7)
+     *   https://www.rfc-editor.org/rfc/rfc8152.html#section-7
+     * 
+     * @param string $client_data_json Base64url-encoded client data JSON
+     * @param string $attestation_object Base64url-encoded attestation object
+     * @return array Contains 'credential_id' and 'public_key' (both base64-encoded)
+     * @throws \RuntimeException If attestation object is malformed
+     */
     public function get_data_for_register(string $client_data_json, string $attestation_object): array
     {
+        $client_data = json_decode(base64_decode($client_data_json), true);
+
         $this->validate_client_data($client_data, 'webauthn.create');
 
         $attestation_raw = $this->decode_base64_url($attestation_object);
 
+        // Use CBOR library to decode attestation object
         $stream = new \CBOR\StringStream($attestation_raw);
         $attestation_map = (new \CBOR\Decoder())->decode($stream);
 
+        // Convert CBOR map to array
         if ($attestation_map instanceof \CBOR\MapObject) {
             $attestation_array = [];
             foreach ($attestation_map as $key => $value) {
@@ -94,6 +196,29 @@ final class WebAuthnService
         return $result;
     }
 
+    /**
+     * Verify an authentication assertion signature.
+     * 
+     * Validates the digital signature created by the authenticator during authentication.
+     * Supports ES256 (ECDSA P-256) and RS256 (RSA-PSS) algorithms as defined in COSE.
+     * 
+     * References:
+     * - WebAuthn Level 2 § 7.2: Verifying an Authentication Assertion
+     *   https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion
+     * - COSE Algorithm -7 (ES256): ECDSA w/ SHA-256
+     *   RFC 8152 § 8.1: https://www.rfc-editor.org/rfc/rfc8152.html#section-8.1
+     * - COSE Algorithm -257 (RS256): RSASSA-PKCS1-v1_5 w/ SHA-256
+     *   RFC 8152 § 8.1: https://www.rfc-editor.org/rfc/rfc8152.html#section-8.1
+     * - SEC1: Elliptic Curve Cryptography (for EC key encoding)
+     *   https://www.secg.org/sec1-v2.pdf
+     * 
+     * @param string $client_data_json Base64url-encoded client data JSON
+     * @param string $authenticator_data Base64url-encoded authenticator data
+     * @param string $signature Base64url-encoded signature
+     * @param string $public_key Base64-encoded COSE public key
+     * @return void
+     * @throws \RuntimeException If signature verification fails or algorithm is unsupported
+     */
     public function verify(
         string $client_data_json,
         string $authenticator_data,
@@ -112,11 +237,14 @@ final class WebAuthnService
 
         $signed_data = $auth_data . $client_data_hash;
 
+        // Use COSE library to parse the public key
         $cose = base64_decode($public_key);
 
+        // First decode CBOR to get the array representation
         $stream = new \CBOR\StringStream($cose);
         $coseData = (new \CBOR\Decoder())->decode($stream);
 
+        // Helper function to convert CBOR objects to primitive values
         $convertCborValue = function ($value) use (&$convertCborValue) {
             if ($value instanceof \CBOR\ByteStringObject) {
                 return $value->getValue();
@@ -139,13 +267,16 @@ final class WebAuthnService
                 }
                 return $result;
             } else {
+                // For primitives (int, string, etc.) or unknown types, return as-is
                 return $value;
             }
         };
 
+        // Convert CBOR object to array for Cose\Key\Key
         if ($coseData instanceof \CBOR\MapObject) {
             $coseArray = [];
 
+            // MapObject iteration returns MapItem objects, not key-value pairs
             foreach ($coseData as $mapItem) {
                 if ($mapItem instanceof \CBOR\MapItem) {
                     $key = $convertCborValue($mapItem->getKey());
@@ -162,32 +293,38 @@ final class WebAuthnService
 
         $coseKey = \Cose\Key\Key::create($coseArray);
 
+        // Convert COSE key to PEM format for OpenSSL verification
         $algId = $coseKey->alg();
 
         switch ($algId) {
-            case -7:
-                $x = $coseKey->get(-2);
-                $y = $coseKey->get(-3);
+            case self::COSE_ALG_ES256:
+                // Extract x and y coordinates from COSE key
+                $x = $coseKey->get(-2); // x coordinate
+                $y = $coseKey->get(-3); // y coordinate
 
                 if (!$x || !$y) {
                     throw new \RuntimeException('Missing EC coordinates in COSE key');
                 }
 
+                // Build uncompressed EC public key (0x04 + x + y)
                 $publicKeyBin = "\x04" . $x . $y;
 
+                // Create PEM format for EC P-256 key
                 $der = $this->createEcP256Der($publicKeyBin);
                 $pem = "-----BEGIN PUBLIC KEY-----\n" . chunk_split(base64_encode($der), 64, "\n") . "-----END PUBLIC KEY-----";
                 $opensslAlgo = OPENSSL_ALGO_SHA256;
                 break;
 
-            case -257:
-                $n = $coseKey->get(-1);
-                $e = $coseKey->get(-2);
+            case self::COSE_ALG_RS256:
+                // Extract n (modulus) and e (exponent) from COSE key
+                $n = $coseKey->get(-1); // modulus
+                $e = $coseKey->get(-2); // exponent
 
                 if (!$n || !$e) {
                     throw new \RuntimeException('Missing RSA parameters in COSE key');
                 }
 
+                // Create PEM format for RSA key
                 $der = $this->createRsaDer($n, $e);
                 $pem = "-----BEGIN PUBLIC KEY-----\n" . chunk_split(base64_encode($der), 64, "\n") . "-----END PUBLIC KEY-----";
                 $opensslAlgo = OPENSSL_ALGO_SHA256;
@@ -197,25 +334,69 @@ final class WebAuthnService
                 throw new \RuntimeException("Unsupported algorithm: {$algId}");
         }
 
-        $ok = openssl_verify($signed_data, $signature, $pem, $opensslAlgo);
+        $signature_verify = openssl_verify($signed_data, $signature, $pem, $opensslAlgo);
 
-        if ($ok !== 1) {
+        if ($signature_verify !== 1) {
             throw new \RuntimeException('Invalid signature');
         }
     }
 
+    /**
+     * Generate a cryptographically secure random challenge.
+     * 
+     * Creates a base64url-encoded random challenge for use in credential creation
+     * and authentication ceremonies.
+     * 
+     * References:
+     * - WebAuthn Level 2 § 13.4.3: Cryptographic Challenges
+     *   https://www.w3.org/TR/webauthn-2/#sctn-cryptographic-challenges
+     * - RFC 4648 § 5: Base64url Encoding
+     *   https://www.rfc-editor.org/rfc/rfc4648.html#section-5
+     * 
+     * @return string Base64url-encoded challenge (no padding)
+     */
     public function generate_challenge(): string
     {
         $length = config('passkey.challenge_length', 32);
         return rtrim(strtr(base64_encode(random_bytes($length)), '+/', '-_'), '=');
     }
 
+    /**
+     * Decode a base64url-encoded string.
+     * 
+     * Converts base64url encoding (URL-safe, no padding) to standard base64
+     * and decodes it to binary data.
+     * 
+     * References:
+     * - RFC 4648 § 5: Base 64 Encoding with URL and Filename Safe Alphabet
+     *   https://www.rfc-editor.org/rfc/rfc4648.html#section-5
+     * 
+     * @param string $input Base64url-encoded string
+     * @return string Decoded binary data
+     */
     public function decode_base64_url(string $input): string
     {
         $input .= str_repeat('=', (4 - strlen($input) % 4) % 4);
         return base64_decode(strtr($input, '-_', '+/'), true);
     }
 
+    /**
+     * Validate the client data JSON structure and type.
+     * 
+     * Ensures the client data contains required fields and matches the expected
+     * ceremony type (webauthn.create or webauthn.get).
+     * 
+     * References:
+     * - WebAuthn Level 2 § 6.5.2: Client Data
+     *   https://www.w3.org/TR/webauthn-2/#client-data
+     * - WebAuthn Level 2 § 5.8.1: Client Data Used in WebAuthn Signatures
+     *   https://www.w3.org/TR/webauthn-2/#dictdef-collectedclientdata
+     * 
+     * @param array $client_data Decoded client data JSON
+     * @param string $expected_type Expected type ('webauthn.create' or 'webauthn.get')
+     * @return void
+     * @throws \InvalidArgumentException If client data is malformed or type doesn't match
+     */
     public function validate_client_data(array $client_data, string $expected_type): void
     {
         if (!isset($client_data['type'], $client_data['challenge'], $client_data['origin'])) {
@@ -227,6 +408,23 @@ final class WebAuthnService
         }
     }
 
+    /**
+     * Parse authenticator data structure.
+     * 
+     * Extracts components from the binary authenticator data including RP ID hash,
+     * flags, signature counter, AAGUID, credential ID, and public key.
+     * 
+     * References:
+     * - WebAuthn Level 2 § 6.5.4: Authenticator Data
+     *   https://www.w3.org/TR/webauthn-2/#sctn-authenticator-data
+     * - WebAuthn Level 2 § 6.5.4.1: Flags
+     *   https://www.w3.org/TR/webauthn-2/#flags
+     * - WebAuthn Level 2 § 6.5.4.4: Attested Credential Data
+     *   https://www.w3.org/TR/webauthn-2/#sctn-attested-credential-data
+     * 
+     * @param string $auth_data Binary authenticator data
+     * @return array Parsed components: rp_id_hash, flags, sign_count, aaguid, credential_id, public_key_cbor
+     */
     public function parse_auth_data(string $auth_data): array
     {
         $offset = 0;
@@ -247,6 +445,19 @@ final class WebAuthnService
         return compact('rp_id_hash', 'flags', 'sign_count', 'aaguid', 'credential_id', 'public_key_cbor');
     }
 
+    /**
+     * Extract the challenge from client data JSON.
+     * 
+     * Decodes the client data JSON and extracts the challenge value,
+     * converting it back to base64url format.
+     * 
+     * References:
+     * - WebAuthn Level 2 § 5.8.1: CollectedClientData
+     *   https://www.w3.org/TR/webauthn-2/#dictdef-collectedclientdata
+     * 
+     * @param string $client_data_json Base64url-encoded client data JSON
+     * @return string Base64url-encoded challenge
+     */
     public function get_challenge_from_client_data_json(string $client_data_json): string
     {
         $client_data = json_decode(base64_decode($client_data_json), true);
@@ -256,45 +467,93 @@ final class WebAuthnService
     }
 
     /**
-     * Create DER-encoded EC P-256 public key
+     * Create DER-encoded EC P-256 public key.
+     * 
+     * Converts an uncompressed EC P-256 public key (0x04 + x + y coordinates)
+     * to DER format for use with OpenSSL verification.
+     * 
+     * References:
+     * - SEC1 § 2.3.3: Elliptic-Curve-Point-to-Octet-String Conversion
+     *   https://www.secg.org/sec1-v2.pdf
+     * - RFC 5480: Elliptic Curve Cryptography Subject Public Key Information
+     *   https://www.rfc-editor.org/rfc/rfc5480.html
+     * - X.690: ASN.1 DER encoding rules
+     *   https://www.itu.int/rec/T-REC-X.690/
+     * 
+     * @param string $publicKey Uncompressed EC public key (65 bytes: 0x04 + x + y)
+     * @return string DER-encoded SubjectPublicKeyInfo structure
      */
     private function createEcP256Der(string $publicKey): string
     {
+        // EC P-256 OID: 1.2.840.10045.3.1.7
         $oid = "\x06\x08\x2a\x86\x48\xce\x3d\x03\x01\x07";
 
+        // Algorithm identifier for EC public key
         $algId = "\x30\x13\x06\x07\x2a\x86\x48\xce\x3d\x02\x01" . $oid;
 
+        // Bit string containing the public key
         $bitString = "\x03" . chr(strlen($publicKey) + 1) . "\x00" . $publicKey;
 
+        // Complete SEQUENCE
         $der = $algId . $bitString;
         return "\x30" . chr(strlen($der)) . $der;
     }
 
     /**
-     * Create DER-encoded RSA public key
+     * Create DER-encoded RSA public key.
+     * 
+     * Converts RSA modulus and exponent to DER format for use with OpenSSL verification.
+     * 
+     * References:
+     * - RFC 8017 § A.1.1: RSA Public Key Syntax (PKCS#1)
+     *   https://www.rfc-editor.org/rfc/rfc8017.html#appendix-A.1.1
+     * - RFC 5280 § 4.1: SubjectPublicKeyInfo
+     *   https://www.rfc-editor.org/rfc/rfc5280.html#section-4.1
+     * - X.690: ASN.1 DER encoding rules
+     *   https://www.itu.int/rec/T-REC-X.690/
+     * 
+     * @param string $modulus RSA modulus (n)
+     * @param string $exponent RSA public exponent (e)
+     * @return string DER-encoded SubjectPublicKeyInfo structure
      */
     private function createRsaDer(string $modulus, string $exponent): string
     {
+        // Encode integer with DER format
         $encodeInt = function ($int) {
+            // Add leading zero if high bit is set
             if (ord($int[0]) & 0x80) {
                 $int = "\x00" . $int;
             }
             return "\x02" . self::encodeDerLength(strlen($int)) . $int;
         };
 
+        // RSA public key SEQUENCE (modulus + exponent)
         $rsaKey = $encodeInt($modulus) . $encodeInt($exponent);
         $rsaKeySeq = "\x30" . self::encodeDerLength(strlen($rsaKey)) . $rsaKey;
 
+        // Bit string
         $bitString = "\x03" . self::encodeDerLength(strlen($rsaKeySeq) + 1) . "\x00" . $rsaKeySeq;
 
+        // Algorithm identifier for RSA
         $algId = "\x30\x0d\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x01\x01\x05\x00";
 
+        // Complete SEQUENCE
         $der = $algId . $bitString;
         return "\x30" . self::encodeDerLength(strlen($der)) . $der;
     }
 
     /**
-     * Encode DER length field
+     * Encode DER length field.
+     * 
+     * Implements DER length encoding: short form for lengths < 128,
+     * long form for lengths >= 128.
+     * 
+     * References:
+     * - X.690 § 8.1.3: Length Encoding
+     *   https://www.itu.int/rec/T-REC-X.690/
+     * 
+     * @param int $length Length value to encode
+     * @return string DER-encoded length
      */
     private static function encodeDerLength(int $length): string
     {
@@ -311,17 +570,34 @@ final class WebAuthnService
         return chr(0x80 | strlen($encoded)) . $encoded;
     }
 
+    /**
+     * Register a new passkey for a user.
+     * 
+     * Processes the registration response from the authenticator, validates the data,
+     * and persists the passkey to the database.
+     * 
+     * References:
+     * - WebAuthn Level 2 § 7.1: Registering a New Credential
+     *   https://www.w3.org/TR/webauthn-2/#sctn-registering-a-new-credential
+     * 
+     * @param array $validated Validated registration response data
+     * @param mixed $userId User identifier
+     * @return Passkey Created passkey model instance
+     */
     public function registerPasskey(array $validated, $userId): Passkey
     {
+        // Extract challenge from clientDataJSON
         $challenge = $this->get_challenge_from_client_data_json(
             $validated['response']['clientDataJSON']
         );
 
+        // Parse credential data
         $parsed = $this->get_data_for_register(
             $validated['response']['clientDataJSON'],
             $validated['response']['attestationObject']
         );
 
+        // Create and persist the passkey
         $passkey = Passkey::create([
             'user_id' => $userId,
             'label' => $validated['label'] ?? 'Default Passkey',
@@ -333,8 +609,26 @@ final class WebAuthnService
         return $passkey;
     }
 
+    /**
+     * Verify a passkey authentication assertion.
+     * 
+     * Looks up the passkey by credential ID, verifies the signature,
+     * and returns the authenticated passkey.
+     * 
+     * References:
+     * - WebAuthn Level 2 § 7.2: Verifying an Authentication Assertion
+     *   https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion
+     * 
+     * @param string $credentialIdBase64Url Base64url-encoded credential ID
+     * @param array $response Authentication response data
+     * @return Passkey Verified passkey model instance
+     * @throws \Exception If passkey not found or signature verification fails
+     */
     public function verifyPasskey(string $credentialIdBase64Url, array $response): Passkey
     {
+        // Convert base64url to base64 standard for database lookup
+        // The client sends base64url (- and _ chars, no padding)
+        // But we store base64 standard (+ and / chars, with padding)
         $credentialIdBase64 = str_pad(
             strtr($credentialIdBase64Url, '-_', '+/'),
             strlen($credentialIdBase64Url) + (4 - strlen($credentialIdBase64Url) % 4) % 4,
@@ -342,12 +636,14 @@ final class WebAuthnService
             STR_PAD_RIGHT
         );
 
+        // Find the passkey by credential_id (base64 standard format)
         $passkey = Passkey::where('credential_id', $credentialIdBase64)->first();
 
         if (!$passkey) {
             throw new \Exception('Passkey not found');
         }
 
+        // Verify the signature using Webauthn
         $this->verify(
             $response['clientDataJSON'],
             $response['authenticatorData'],
