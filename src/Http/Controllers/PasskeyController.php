@@ -4,6 +4,8 @@ namespace Xefi\LaravelPasskey\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 use Xefi\LaravelPasskey\Models\Passkey;
 use Xefi\LaravelPasskey\Services\WebAuthnService;
@@ -32,9 +34,7 @@ class PasskeyController extends Controller
         $user = $request->user();
 
         if (!$user) {
-            return response()->json([
-                'message' => 'Unauthenticated',
-            ], 401);
+            throw new AuthenticationException('Unauthenticated');
         }
 
         $passkeys = Passkey::where('user_id', $user->id)
@@ -54,9 +54,7 @@ class PasskeyController extends Controller
         $user = $request->user();
 
         if (!$user) {
-            return response()->json([
-                'message' => 'Unauthenticated',
-            ], 401);
+            throw new AuthenticationException('Unauthenticated');
         }
 
         $validated = $request->validated();
@@ -111,9 +109,7 @@ class PasskeyController extends Controller
         $passkeys = Passkey::where('user_id', 1)->get(['credential_id']);
 
         if ($passkeys->isEmpty()) {
-            return response()->json([
-                'message' => 'No passkeys found for this user',
-            ], 404);
+            throw new ModelNotFoundException('No passkeys found for this user');
         }
 
         $allowCredentials = $passkeys->map(function ($passkey) {
@@ -171,9 +167,7 @@ class PasskeyController extends Controller
         $user = $passkey->user;
 
         if (!$user) {
-            return response()->json([
-                'message' => 'User not found',
-            ], 404);
+            throw new ModelNotFoundException('User not found');
         }
 
         $token = $user->createToken('passkey-auth')->plainTextToken;
