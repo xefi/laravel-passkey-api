@@ -41,9 +41,10 @@ php artisan vendor:publish --tag=passkey-config
 ```
 
 This creates `config/passkey.php` where you can customize:
-- `user_model`: The User model class (default: `App\Models\User`)
-- `timeout`: Passkey operation timeout in milliseconds
-- `challenge_length`: Length of the challenge in bytes
+- `enabled`: Enable/disable the passkey package (default: `true`, env: `PASSKEY_ENABLED`)
+- `timeout`: Passkey operation timeout in milliseconds (default: `60000`, env: `PASSKEY_TIMEOUT`)
+- `challenge_length`: Length of the challenge in bytes (default: `32`, env: `PASSKEY_CHALLENGE_LENGTH`)
+- `user_model`: The User model class (default: `App\Models\User`, env: `PASSKEY_USER_MODEL`)
 
 ### User Model Setup
 
@@ -163,6 +164,28 @@ Content-Type: application/json
 
 Returns options needed to verify a passkey credential (challenge and allowed credentials).
 
+**Request Body:**
+```json
+{
+  "credential_id": "base64-encoded-credential-id"
+}
+```
+
+**Response:**
+```json
+{
+  "challenge": "base64-encoded-challenge",
+  "allowCredentials": [
+    {
+      "id": "base64-encoded-credential-id",
+      "type": "public-key"
+    }
+  ],
+  "timeout": 60000,
+  "userVerification": "preferred"
+}
+```
+
 #### Verify Passkey
 ```http
 POST /api/passkeys/verify
@@ -248,8 +271,8 @@ This library follows a clean, service-oriented architecture to maintain the **Si
   +-----------------------+      +-----------------------+
   | PasskeyController     | <----| WebAuthnService       | (Business Logic)
   | (Thin Layer)          |      |-----------------------|
-  +-----------------------+      | - Parsing (CBOR)      |
-           |                     | - Verify (COSE/OpenSSL)|
+  | - Throws Exceptions   |      | - Parsing (CBOR)      |
+  +-----------------------+      | - Verify (COSE/OpenSSL)|
            |                     | - Data Extraction     |
            v                     +-----------------------+
   +-----------------------+                  |
@@ -264,6 +287,9 @@ This library follows a clean, service-oriented architecture to maintain the **Si
   | (App\Models\User)     |
   +-----------------------+
 ```
+
+> [!NOTE]
+> The controller uses Laravel's exception handling mechanism. Errors are thrown as exceptions (`AuthenticationException`, `ModelNotFoundException`, etc.) rather than returning JSON error responses directly.
 
 ## Typical Sequence Flow
 
