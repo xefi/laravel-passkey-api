@@ -2,13 +2,12 @@
 
 namespace Xefi\LaravelPasskey\Services;
 
+use Xefi\LaravelPasskey\Enums\PasskeyAlgorithm;
 use Xefi\LaravelPasskey\Models\Passkey;
 use Xefi\LaravelPasskey\Exceptions\InvalidCoseKeyException;
 use Xefi\LaravelPasskey\Exceptions\InvalidSignatureException;
 use Xefi\LaravelPasskey\Exceptions\MalformedClientDataException;
 use Xefi\LaravelPasskey\Exceptions\MalformedAttestationException;
-use Xefi\LaravelPasskey\Exceptions\MissingEcCoordinatesException;
-use Xefi\LaravelPasskey\Exceptions\MissingRsaParametersException;
 use Xefi\LaravelPasskey\Exceptions\UnsupportedAlgorithmException;
 use Xefi\LaravelPasskey\Exceptions\InvalidAttestationFormatException;
 
@@ -47,16 +46,6 @@ use Xefi\LaravelPasskey\Exceptions\InvalidAttestationFormatException;
  */
 final class WebAuthnService
 {
-    /**
-     * COSE algorithm identifier for ES256 (ECDSA with P-256 and SHA-256)
-     */
-    private const COSE_ALG_ES256 = -7;
-
-    /**
-     * COSE algorithm identifier for RS256 (RSASSA-PKCS1-v1_5 with SHA-256)
-     */
-    private const COSE_ALG_RS256 = -257;
-
     /**
      * Generate registration options for creating a new passkey.
      * 
@@ -99,8 +88,8 @@ final class WebAuthnService
                 'displayName' => $display_name,
             ],
             'pubKeyCredParams' => [
-                ['type' => 'public-key', 'alg' => self::COSE_ALG_ES256],
-                ['type' => 'public-key', 'alg' => self::COSE_ALG_RS256],
+                ['type' => 'public-key', 'alg' => PasskeyAlgorithm::ES256->value],
+                ['type' => 'public-key', 'alg' => PasskeyAlgorithm::RS256->value],
             ],
             'timeout' => config('passkey.timeout', 600000),
             'attestation' => 'none',
@@ -228,9 +217,8 @@ final class WebAuthnService
      * @return void
      * @throws InvalidSignatureException If signature verification fails
      * @throws InvalidCoseKeyException If the COSE key cannot be parsed
-     * @throws MissingEcCoordinatesException If EC key coordinates are absent
-     * @throws MissingRsaParametersException If RSA key parameters are absent
      * @throws UnsupportedAlgorithmException If the algorithm identifier is not supported
+     * @see PasskeyAlgorithm For per-algorithm exceptions (MissingEcCoordinatesException, MissingRsaParametersException)
      */
     public function verify(
         string $client_data_json,
@@ -307,45 +295,10 @@ final class WebAuthnService
         $coseKey = \Cose\Key\Key::create($coseArray);
 
         // Convert COSE key to PEM format for OpenSSL verification
-        $algId = $coseKey->alg();
+        $algorithm = PasskeyAlgorithm::tryFrom($coseKey->alg())
+            ?? throw new UnsupportedAlgorithmException("Unsupported algorithm: {$coseKey->alg()}");
 
-        switch ($algId) {
-            case self::COSE_ALG_ES256:
-                // Extract x and y coordinates from COSE key
-                $x = $coseKey->get(-2); // x coordinate
-                $y = $coseKey->get(-3); // y coordinate
-
-                if (!$x || !$y) {
-                    throw new MissingEcCoordinatesException();
-                }
-
-                // Build uncompressed EC public key (0x04 + x + y)
-                $publicKeyBin = "\x04" . $x . $y;
-
-                // Create PEM format for EC P-256 key
-                $der = $this->createEcP256Der($publicKeyBin);
-                $pem = "-----BEGIN PUBLIC KEY-----\n" . chunk_split(base64_encode($der), 64, "\n") . "-----END PUBLIC KEY-----";
-                $opensslAlgo = OPENSSL_ALGO_SHA256;
-                break;
-
-            case self::COSE_ALG_RS256:
-                // Extract n (modulus) and e (exponent) from COSE key
-                $n = $coseKey->get(-1); // modulus
-                $e = $coseKey->get(-2); // exponent
-
-                if (!$n || !$e) {
-                    throw new MissingRsaParametersException();
-                }
-
-                // Create PEM format for RSA key
-                $der = $this->createRsaDer($n, $e);
-                $pem = "-----BEGIN PUBLIC KEY-----\n" . chunk_split(base64_encode($der), 64, "\n") . "-----END PUBLIC KEY-----";
-                $opensslAlgo = OPENSSL_ALGO_SHA256;
-                break;
-
-            default:
-                throw new UnsupportedAlgorithmException("Unsupported algorithm: {$algId}");
-        }
+        ['pem' => $pem, 'opensslAlgo' => $opensslAlgo] = $algorithm->buildPem($coseKey);
 
         $signature_verify = openssl_verify($signed_data, $signature, $pem, $opensslAlgo);
 
@@ -477,110 +430,6 @@ final class WebAuthnService
         $challenge = base64_decode(strtr($client_data['challenge'], '-_', '+/'));
 
         return rtrim(strtr(base64_encode($challenge), '+/', '-_'), '=');
-    }
-
-    /**
-     * Create DER-encoded EC P-256 public key.
-     * 
-     * Converts an uncompressed EC P-256 public key (0x04 + x + y coordinates)
-     * to DER format for use with OpenSSL verification.
-     * 
-     * References:
-     * - SEC1 § 2.3.3: Elliptic-Curve-Point-to-Octet-String Conversion
-     *   https://www.secg.org/sec1-v2.pdf
-     * - RFC 5480: Elliptic Curve Cryptography Subject Public Key Information
-     *   https://www.rfc-editor.org/rfc/rfc5480.html
-     * - X.690: ASN.1 DER encoding rules
-     *   https://www.itu.int/rec/T-REC-X.690/
-     * 
-     * @param string $publicKey Uncompressed EC public key (65 bytes: 0x04 + x + y)
-     * @return string DER-encoded SubjectPublicKeyInfo structure
-     */
-    private function createEcP256Der(string $publicKey): string
-    {
-        // EC P-256 OID: 1.2.840.10045.3.1.7
-        $oid = "\x06\x08\x2a\x86\x48\xce\x3d\x03\x01\x07";
-
-        // Algorithm identifier for EC public key
-        $algId = "\x30\x13\x06\x07\x2a\x86\x48\xce\x3d\x02\x01" . $oid;
-
-        // Bit string containing the public key
-        $bitString = "\x03" . chr(strlen($publicKey) + 1) . "\x00" . $publicKey;
-
-        // Complete SEQUENCE
-        $der = $algId . $bitString;
-        return "\x30" . chr(strlen($der)) . $der;
-    }
-
-    /**
-     * Create DER-encoded RSA public key.
-     * 
-     * Converts RSA modulus and exponent to DER format for use with OpenSSL verification.
-     * 
-     * References:
-     * - RFC 8017 § A.1.1: RSA Public Key Syntax (PKCS#1)
-     *   https://www.rfc-editor.org/rfc/rfc8017.html#appendix-A.1.1
-     * - RFC 5280 § 4.1: SubjectPublicKeyInfo
-     *   https://www.rfc-editor.org/rfc/rfc5280.html#section-4.1
-     * - X.690: ASN.1 DER encoding rules
-     *   https://www.itu.int/rec/T-REC-X.690/
-     * 
-     * @param string $modulus RSA modulus (n)
-     * @param string $exponent RSA public exponent (e)
-     * @return string DER-encoded SubjectPublicKeyInfo structure
-     */
-    private function createRsaDer(string $modulus, string $exponent): string
-    {
-        // Encode integer with DER format
-        $encodeInt = function ($int) {
-            // Add leading zero if high bit is set
-            if (ord($int[0]) & 0x80) {
-                $int = "\x00" . $int;
-            }
-            return "\x02" . self::encodeDerLength(strlen($int)) . $int;
-        };
-
-        // RSA public key SEQUENCE (modulus + exponent)
-        $rsaKey = $encodeInt($modulus) . $encodeInt($exponent);
-        $rsaKeySeq = "\x30" . self::encodeDerLength(strlen($rsaKey)) . $rsaKey;
-
-        // Bit string
-        $bitString = "\x03" . self::encodeDerLength(strlen($rsaKeySeq) + 1) . "\x00" . $rsaKeySeq;
-
-        // Algorithm identifier for RSA
-        $algId = "\x30\x0d\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x01\x01\x05\x00";
-
-        // Complete SEQUENCE
-        $der = $algId . $bitString;
-        return "\x30" . self::encodeDerLength(strlen($der)) . $der;
-    }
-
-    /**
-     * Encode DER length field.
-     * 
-     * Implements DER length encoding: short form for lengths < 128,
-     * long form for lengths >= 128.
-     * 
-     * References:
-     * - X.690 § 8.1.3: Length Encoding
-     *   https://www.itu.int/rec/T-REC-X.690/
-     * 
-     * @param int $length Length value to encode
-     * @return string DER-encoded length
-     */
-    private static function encodeDerLength(int $length): string
-    {
-        if ($length < 128) {
-            return chr($length);
-        }
-
-        $encoded = '';
-        while ($length > 0) {
-            $encoded = chr($length & 0xff) . $encoded;
-            $length >>= 8;
-        }
-
-        return chr(0x80 | strlen($encoded)) . $encoded;
     }
 
     /**
