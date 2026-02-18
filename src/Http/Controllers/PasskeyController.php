@@ -103,7 +103,7 @@ class PasskeyController extends Controller
     {
         $validated = $request->validated();
 
-        $passkey = Passkey::where('credential_id', $validated['credential_id'])->first();
+        $passkey = Passkey::query()->where('credential_id', $validated['credential_id'])->first();
 
         if (!$passkey) {
             throw new PasskeyNotFoundException();
