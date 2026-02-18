@@ -174,8 +174,8 @@ class PasskeyController extends Controller
             'message' => 'Authentication successful',
             'user' => [
                 'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
+                'name' => $user->name ?? null,
+                'email' => $user->email ?? null,
             ],
             'token' => $token,
         ]);

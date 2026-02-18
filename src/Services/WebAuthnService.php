@@ -3,6 +3,14 @@
 namespace Xefi\LaravelPasskey\Services;
 
 use Xefi\LaravelPasskey\Models\Passkey;
+use Xefi\LaravelPasskey\Exceptions\InvalidCoseKeyException;
+use Xefi\LaravelPasskey\Exceptions\InvalidSignatureException;
+use Xefi\LaravelPasskey\Exceptions\MalformedClientDataException;
+use Xefi\LaravelPasskey\Exceptions\MalformedAttestationException;
+use Xefi\LaravelPasskey\Exceptions\MissingEcCoordinatesException;
+use Xefi\LaravelPasskey\Exceptions\MissingRsaParametersException;
+use Xefi\LaravelPasskey\Exceptions\UnsupportedAlgorithmException;
+use Xefi\LaravelPasskey\Exceptions\InvalidAttestationFormatException;
 
 /**
  * WebAuthn service for handling passkey operations.
@@ -153,7 +161,8 @@ final class WebAuthnService
      * @param string $client_data_json Base64url-encoded client data JSON
      * @param string $attestation_object Base64url-encoded attestation object
      * @return array Contains 'credential_id' and 'public_key' (both base64-encoded)
-     * @throws \RuntimeException If attestation object is malformed
+     * @throws InvalidAttestationFormatException If attestation object is not a valid CBOR map
+     * @throws MalformedAttestationException If attestation object is missing required fields
      */
     public function get_data_for_register(string $client_data_json, string $attestation_object): array
     {
@@ -174,11 +183,11 @@ final class WebAuthnService
                 $attestation_array[$key] = $value;
             }
         } else {
-            throw new \RuntimeException('Invalid attestation object format');
+            throw new InvalidAttestationFormatException();
         }
 
         if (!isset($attestation_array['authData'])) {
-            throw new \RuntimeException('Malformed attestationObject: missing authData');
+            throw new MalformedAttestationException();
         }
 
         $auth_data = $attestation_array['authData'];
@@ -217,7 +226,11 @@ final class WebAuthnService
      * @param string $signature Base64url-encoded signature
      * @param string $public_key Base64-encoded COSE public key
      * @return void
-     * @throws \RuntimeException If signature verification fails or algorithm is unsupported
+     * @throws InvalidSignatureException If signature verification fails
+     * @throws InvalidCoseKeyException If the COSE key cannot be parsed
+     * @throws MissingEcCoordinatesException If EC key coordinates are absent
+     * @throws MissingRsaParametersException If RSA key parameters are absent
+     * @throws UnsupportedAlgorithmException If the algorithm identifier is not supported
      */
     public function verify(
         string $client_data_json,
@@ -288,7 +301,7 @@ final class WebAuthnService
                 $coseArray[$key] = $value;
             }
         } else {
-            throw new \RuntimeException('Invalid COSE key format');
+            throw new InvalidCoseKeyException();
         }
 
         $coseKey = \Cose\Key\Key::create($coseArray);
@@ -303,7 +316,7 @@ final class WebAuthnService
                 $y = $coseKey->get(-3); // y coordinate
 
                 if (!$x || !$y) {
-                    throw new \RuntimeException('Missing EC coordinates in COSE key');
+                    throw new MissingEcCoordinatesException();
                 }
 
                 // Build uncompressed EC public key (0x04 + x + y)
@@ -321,7 +334,7 @@ final class WebAuthnService
                 $e = $coseKey->get(-2); // exponent
 
                 if (!$n || !$e) {
-                    throw new \RuntimeException('Missing RSA parameters in COSE key');
+                    throw new MissingRsaParametersException();
                 }
 
                 // Create PEM format for RSA key
@@ -331,13 +344,13 @@ final class WebAuthnService
                 break;
 
             default:
-                throw new \RuntimeException("Unsupported algorithm: {$algId}");
+                throw new UnsupportedAlgorithmException("Unsupported algorithm: {$algId}");
         }
 
         $signature_verify = openssl_verify($signed_data, $signature, $pem, $opensslAlgo);
 
         if ($signature_verify !== 1) {
-            throw new \RuntimeException('Invalid signature');
+            throw new InvalidSignatureException();
         }
     }
 
@@ -395,16 +408,16 @@ final class WebAuthnService
      * @param array $client_data Decoded client data JSON
      * @param string $expected_type Expected type ('webauthn.create' or 'webauthn.get')
      * @return void
-     * @throws \InvalidArgumentException If client data is malformed or type doesn't match
+     * @throws MalformedClientDataException If client data is malformed or type doesn't match
      */
     public function validate_client_data(array $client_data, string $expected_type): void
     {
         if (!isset($client_data['type'], $client_data['challenge'], $client_data['origin'])) {
-            throw new \InvalidArgumentException('Malformed client data');
+            throw new MalformedClientDataException();
         }
 
         if ($client_data['type'] !== $expected_type) {
-            throw new \InvalidArgumentException("Unexpected clientData type: {$client_data['type']}");
+            throw new MalformedClientDataException("Unexpected clientData type: {$client_data['type']}");
         }
     }
 
