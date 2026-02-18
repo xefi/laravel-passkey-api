@@ -144,7 +144,6 @@ Registers a new passkey credential and persists it to the database.
 **Response:**
 ```json
 {
-  "message": "Passkey registered successfully",
   "passkey": {
     "id": 1,
     "label": "My Security Key",
@@ -208,6 +207,18 @@ Verifies a passkey authentication attempt without creating a session. Useful for
 }
 ```
 
+**Response:**
+```json
+{
+  "user": {
+    "id": 1
+  },
+  "passkey": {
+    "id": 1
+  }
+}
+```
+
 #### Authenticate (Login)
 ```http
 POST /api/passkeys/login
@@ -221,7 +232,6 @@ Authenticates a user via passkey and returns a Sanctum token.
 **Response:**
 ```json
 {
-  "message": "Authentication successful",
   "user": {
     "id": 1,
     "name": "User Name",
@@ -258,92 +268,76 @@ foreach ($passkeys as $passkey) {
 
 This library follows a clean, service-oriented architecture to maintain the **Single Responsibility Principle**:
 
-```text
-    [ HTTP Request ]
-           |
-           v
-  +------------------+       +-------------------+
-  | PasskeyRoute     |------>| RegisterRequest   | (Validation)
-  | (api.php)        |       | VerifyRequest     |
-  +------------------+       +-------------------+
-           |
-           v
-  +-----------------------+      +-----------------------+
-  | PasskeyController     | <----| WebAuthnService       | (Business Logic)
-  | (Thin Layer)          |      |-----------------------|
-  | - Throws Exceptions   |      | - Parsing (CBOR)      |
-  +-----------------------+      | - Verify (COSE/OpenSSL)|
-           |                     | - Data Extraction     |
-           v                     +-----------------------+
-  +-----------------------+                  |
-  | Passkey Model         | <----------------+
-  | (Persistence)         |
-  +-----------------------+
-           |
-           | (via HasPasskeys Trait)
-           v
-  +-----------------------+
-  | User Model            |
-  | (App\Models\User)     |
-  +-----------------------+
+```mermaid
+flowchart TD
+    HTTP([HTTP Request])
+
+    HTTP --> Route
+
+    Route["PasskeyRoute\n(api.php)"]
+    Route --> Validation
+
+    Validation["FormRequest Validation\nRegisterRequest / VerifyRequest"]
+    Validation --> Controller
+
+    Controller["PasskeyController\n(Thin Layer)\n— Throws Exceptions"]
+    Service["WebAuthnService\n(Business Logic)\n— Parsing CBOR\n— Verify COSE / OpenSSL\n— Data Extraction"]
+
+    Service --> Controller
+    Controller --> Model
+
+    Model["Passkey Model\n(Persistence)"]
+    Model --> User
+
+    User["User Model\n(App\\Models\\User)\nvia HasPasskeys Trait"]
 ```
 
 > [!NOTE]
-> The controller uses Laravel's exception handling mechanism. Errors are thrown as exceptions (`AuthenticationException`, `ModelNotFoundException`, etc.) rather than returning JSON error responses directly.
+> The controller uses Laravel's exception handling mechanism. Errors are thrown as exceptions (`AuthenticationException`, `PasskeyNotFoundException`, `UserNotFoundException`, etc.) rather than returning JSON error responses directly.
 
 ## Typical Sequence Flow
 
 Here is the typical sequence of interactions between the Client (Browser), the Server (API), and the Authenticator (Security Key, TouchID, etc.):
 
-```text
-     USER            BROWSER (JS)           SERVER (API)        AUTHENTICATOR
-      |                  |                      |                     |
-      |  1. Initial Login|                      |                     |
-      |----------------->|      POST /login     |                     |
-      | (App Logic)      |--------------------->|                     |
-      |                  |   <-- Sanctum Token  |                     |
-      |                  |<---------------------|                     |
-      |                  |                      |                     |
-      |  2. Register     |                      |                     |
-      |----------------->| POST /api/passkeys/register/options        |
-      |                  |--------------------->|                     |
-      |                  |  <-- Reg Options     |                     |
-      |                  |<---------------------|                     |
-      |                  |                      |                     |
-      |                  |  navigator.create()  |                     |
-      |                  |------------------------------------------->|
-      |                  |                      |  3. Fingerprint     |
-      |                  |                      | <------------------ |
-      |  User Interaction|                      |                     |
-      | <----------------|                      |                     |
-      | ---------------->|                      |                     |
-      |                  |                      |  4. Attestation     |
-      |                  | <----------------------------------------- |
-      |                  |                      |                     |
-      |                  | POST /api/passkeys/register                |
-      |                  |--------------------->|                     |
-      |                  |   <-- Success        |                     |
-      |                  |<---------------------|                     |
-      |                  |                      |                     |
-      |  5. Auth (Login) |                      |                     |
-      |----------------->| POST /api/passkeys/verify/options          |
-      |                  |--------------------->|                     |
-      |                  |  <-- Auth Options    |                     |
-      |                  |<---------------------|                     |
-      |                  |                      |                     |
-      |                  |    navigator.get()   |                     |
-      |                  |------------------------------------------->|
-      |                  |                      |  6. Fingerprint     |
-      |                  |                      | <------------------ |
-      |  User Interaction|                      |                     |
-      | <----------------|                      |                     |
-      | ---------------->|                      |                     |
-      |                  |                      |  7. Assertion       |
-      |                  | <----------------------------------------- |
-      |                  |                      |                     |
-      |                  | POST /api/passkeys/login                   |
-      |                  |--------------------->|                     |
-      |                  |   <-- NEW Token      |                     |
-      |                  |<---------------------|                     |
-      |                  |                      |                     |
+```mermaid
+sequenceDiagram
+    actor User
+    participant Browser as Browser (JS)
+    participant Server as Server (API)
+    participant Auth as Authenticator
+
+    Note over User,Auth: 1. Initial Login (App Logic)
+    User->>Browser: Login
+    Browser->>Server: POST /login
+    Server-->>Browser: Sanctum Token
+
+    Note over User,Auth: 2. Register Passkey
+    User->>Browser: Register
+    Browser->>Server: POST /api/passkeys/register/options
+    Server-->>Browser: Registration Options
+
+    Browser->>Auth: navigator.credentials.create()
+    Note over Auth: 3. Fingerprint / Biometric
+    Auth-->>User: Prompt
+    User-->>Auth: Confirm
+    Note over Auth: 4. Attestation
+    Auth-->>Browser: Attestation Object
+
+    Browser->>Server: POST /api/passkeys/register
+    Server-->>Browser: Success
+
+    Note over User,Auth: 5. Authentication (Login)
+    User->>Browser: Login with Passkey
+    Browser->>Server: POST /api/passkeys/verify/options
+    Server-->>Browser: Authentication Options
+
+    Browser->>Auth: navigator.credentials.get()
+    Note over Auth: 6. Fingerprint / Biometric
+    Auth-->>User: Prompt
+    User-->>Auth: Confirm
+    Note over Auth: 7. Assertion
+    Auth-->>Browser: Assertion Object
+
+    Browser->>Server: POST /api/passkeys/login
+    Server-->>Browser: NEW Sanctum Token
 ```
