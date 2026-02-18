@@ -105,7 +105,7 @@ class PasskeyController extends Controller
 
         $passkey = Passkey::query()->where('credential_id', $validated['credential_id'])->first();
 
-        if (!$passkey) {
+        if (is_null($passkey)) {
             throw new PasskeyNotFoundException();
         }
 
