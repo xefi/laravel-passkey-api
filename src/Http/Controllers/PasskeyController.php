@@ -23,6 +23,7 @@ class PasskeyController extends Controller
     {
         $this->webAuthnService = $webAuthnService;
     }
+
     /**
      * Get a list of passkeys for the authenticated user.
      *
@@ -32,10 +33,6 @@ class PasskeyController extends Controller
     public function index(IndexRequest $request): JsonResponse
     {
         $user = $request->user();
-
-        if (!$user) {
-            throw new AuthenticationException('Unauthenticated');
-        }
 
         $passkeys = Passkey::where('user_id', $user->id)
             ->get(['id', 'user_id', 'label', 'credential_id', 'created_at']);
