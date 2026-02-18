@@ -138,8 +138,8 @@ class PasskeyController extends Controller
         );
 
         return response()->json([
-            'user_id' => $passkey->user_id,
-            'passkey_id' => $passkey->id,
+            'user' => ['id' => $passkey->user_id],
+            'passkey' => ['id' => $passkey->id],
         ]);
     }
 
