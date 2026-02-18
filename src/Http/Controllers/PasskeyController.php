@@ -83,7 +83,6 @@ class PasskeyController extends Controller
         );
 
         return response()->json([
-            'message' => 'Passkey registered successfully',
             'passkey' => [
                 'id' => $passkey->id,
                 'label' => $passkey->label,
@@ -138,7 +137,6 @@ class PasskeyController extends Controller
         );
 
         return response()->json([
-            'message' => 'Passkey verification successful',
             'user_id' => $passkey->user_id,
             'passkey_id' => $passkey->id,
         ]);
@@ -168,7 +166,6 @@ class PasskeyController extends Controller
         $token = $user->createToken('passkey-auth')->plainTextToken;
 
         return response()->json([
-            'message' => 'Authentication successful',
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name ?? null,
