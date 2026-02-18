@@ -77,7 +77,7 @@ Returns a list of passkeys registered for the authenticated user.
 
 #### Get Registration Options
 ```http
-POST /api/passkeys/register_options
+POST /api/passkeys/register/options
 Authorization: Bearer <token>
 Content-Type: application/json
 ```
@@ -158,7 +158,7 @@ Registers a new passkey credential and persists it to the database.
 
 #### Get Verification Options
 ```http
-POST /api/passkeys/verify_options
+POST /api/passkeys/verify/options
 Content-Type: application/json
 ```
 
@@ -210,7 +210,7 @@ Verifies a passkey authentication attempt without creating a session. Useful for
 
 #### Authenticate (Login)
 ```http
-POST /api/passkeys/auth
+POST /api/passkeys/login
 Content-Type: application/json
 ```
 
@@ -305,7 +305,7 @@ Here is the typical sequence of interactions between the Client (Browser), the S
       |                  |<---------------------|                     |
       |                  |                      |                     |
       |  2. Register     |                      |                     |
-      |----------------->| POST /api/passkeys/register_options        |
+      |----------------->| POST /api/passkeys/register/options        |
       |                  |--------------------->|                     |
       |                  |  <-- Reg Options     |                     |
       |                  |<---------------------|                     |
@@ -326,7 +326,7 @@ Here is the typical sequence of interactions between the Client (Browser), the S
       |                  |<---------------------|                     |
       |                  |                      |                     |
       |  5. Auth (Login) |                      |                     |
-      |----------------->| POST /api/passkeys/verify_options          |
+      |----------------->| POST /api/passkeys/verify/options          |
       |                  |--------------------->|                     |
       |                  |  <-- Auth Options    |                     |
       |                  |<---------------------|                     |
@@ -341,7 +341,7 @@ Here is the typical sequence of interactions between the Client (Browser), the S
       |                  |                      |  7. Assertion       |
       |                  | <----------------------------------------- |
       |                  |                      |                     |
-      |                  | POST /api/passkeys/auth                    |
+      |                  | POST /api/passkeys/login                   |
       |                  |--------------------->|                     |
       |                  |   <-- NEW Token      |                     |
       |                  |<---------------------|                     |
