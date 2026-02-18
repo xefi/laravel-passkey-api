@@ -17,11 +17,11 @@ use Xefi\LaravelPasskey\Http\Requests\RegisterOptionsRequest;
 
 class PasskeyController extends Controller
 {
-    private WebAuthnService $webAuthnService;
+    private WebAuthnService $passkey;
 
-    public function __construct(WebAuthnService $webAuthnService)
+    public function __construct(WebAuthnService $passkey)
     {
-        $this->webAuthnService = $webAuthnService;
+        $this->passkey = $passkey;
     }
 
     /**
@@ -56,7 +56,7 @@ class PasskeyController extends Controller
 
         $validated = $request->validated();
 
-        $options = $this->webAuthnService->generate_register_options(
+        $options = $this->passkey->generate_register_options(
             $validated['app_name'],
             $validated['app_url'],
             (string) $user->id,
@@ -77,7 +77,7 @@ class PasskeyController extends Controller
     {
         $validated = $request->validated();
 
-        $passkey = $this->webAuthnService->registerPasskey(
+        $passkey = $this->passkey->registerPasskey(
             $validated,
             $request->user()->id
         );
@@ -132,7 +132,7 @@ class PasskeyController extends Controller
     {
         $validated = $request->validated();
 
-        $passkey = $this->webAuthnService->verifyPasskey(
+        $passkey = $this->passkey->verifyPasskey(
             $validated['id'],
             $validated['response']
         );
@@ -154,7 +154,7 @@ class PasskeyController extends Controller
     {
         $validated = $request->validated();
 
-        $passkey = $this->webAuthnService->verifyPasskey(
+        $passkey = $this->passkey->verifyPasskey(
             $validated['id'],
             $validated['response']
         );
