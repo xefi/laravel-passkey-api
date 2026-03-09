@@ -22,8 +22,8 @@ class RegisterOptionsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'app_name' => 'required|string|max:255',
-            'app_url' => 'required|url|max:255',
+            'app_name' => ['required', 'string', 'max:255'],
+            'app_url' => ['required', 'url', 'max:255'],
         ];
     }
 }
