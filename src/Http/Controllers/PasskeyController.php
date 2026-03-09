@@ -35,7 +35,7 @@ class PasskeyController extends Controller
     {
         $user = $request->user();
 
-        $passkeys = Passkey::where('user_id', $user->id)
+        $passkeys = Passkey::query()->where('user_id', $user->id)
             ->get(['id', 'user_id', 'label', 'credential_id', 'created_at']);
 
         return response()->json($passkeys);
