@@ -1,8 +1,7 @@
 <?php
 
-namespace Xefi\LaravelPasskey\Services;
+namespace Xefi\LaravelPasskey\Webauthn;
 
-use Xefi\LaravelPasskey\Enums\PasskeyAlgorithm;
 use Xefi\LaravelPasskey\Models\Passkey;
 use Xefi\LaravelPasskey\Exceptions\InvalidCoseKeyException;
 use Xefi\LaravelPasskey\Exceptions\InvalidSignatureException;
@@ -42,9 +41,9 @@ use Xefi\LaravelPasskey\Exceptions\InvalidAttestationFormatException;
  * Note: "Passkey" is a marketing term for a WebAuthn credential conforming to FIDO2 standards,
  * not an independent specification.
  * 
- * @package Xefi\LaravelPasskey\Services
+ * @package Xefi\LaravelPasskey\Webauthn
  */
-final class WebAuthnService
+final class WebAuthn
 {
     /**
      * Generate registration options for creating a new passkey.
@@ -88,8 +87,8 @@ final class WebAuthnService
                 'displayName' => $display_name,
             ],
             'pubKeyCredParams' => [
-                ['type' => 'public-key', 'alg' => PasskeyAlgorithm::ES256->value],
-                ['type' => 'public-key', 'alg' => PasskeyAlgorithm::RS256->value],
+                ['type' => 'public-key', 'alg' => Algorithm::ES256->value],
+                ['type' => 'public-key', 'alg' => Algorithm::RS256->value],
             ],
             'timeout' => config('passkey.timeout', 600000),
             'attestation' => 'none',
@@ -218,7 +217,7 @@ final class WebAuthnService
      * @throws InvalidSignatureException If signature verification fails
      * @throws InvalidCoseKeyException If the COSE key cannot be parsed
      * @throws UnsupportedAlgorithmException If the algorithm identifier is not supported
-     * @see PasskeyAlgorithm For per-algorithm exceptions (MissingEcCoordinatesException, MissingRsaParametersException)
+     * @see Algorithm For per-algorithm exceptions (MissingEcCoordinatesException, MissingRsaParametersException)
      */
     public function verify(
         string $client_data_json,
@@ -295,7 +294,7 @@ final class WebAuthnService
         $coseKey = \Cose\Key\Key::create($coseArray);
 
         // Convert COSE key to PEM format for OpenSSL verification
-        $algorithm = PasskeyAlgorithm::tryFrom($coseKey->alg())
+        $algorithm = Algorithm::tryFrom($coseKey->alg())
             ?? throw new UnsupportedAlgorithmException("Unsupported algorithm: {$coseKey->alg()}");
 
         ['pem' => $pem, 'opensslAlgo' => $opensslAlgo] = $algorithm->buildPem($coseKey);

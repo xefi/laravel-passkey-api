@@ -7,7 +7,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Auth\AuthenticationException;
 
 use Xefi\LaravelPasskey\Models\Passkey;
-use Xefi\LaravelPasskey\Services\WebAuthnService;
+use Xefi\LaravelPasskey\Webauthn\WebAuthn;
 use Xefi\LaravelPasskey\Http\Requests\IndexRequest;
 use Xefi\LaravelPasskey\Http\Requests\VerifyRequest;
 use Xefi\LaravelPasskey\Http\Requests\RegisterRequest;
@@ -18,9 +18,9 @@ use Xefi\LaravelPasskey\Http\Requests\RegisterOptionsRequest;
 
 class PasskeyController extends Controller
 {
-    private WebAuthnService $passkey;
+    private WebAuthn $passkey;
 
-    public function __construct(WebAuthnService $passkey)
+    public function __construct(WebAuthn $passkey)
     {
         $this->passkey = $passkey;
     }

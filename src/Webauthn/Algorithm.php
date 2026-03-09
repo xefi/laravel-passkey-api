@@ -1,6 +1,6 @@
 <?php
 
-namespace Xefi\LaravelPasskey\Enums;
+namespace Xefi\LaravelPasskey\Webauthn;
 
 use Xefi\LaravelPasskey\Exceptions\MissingEcCoordinatesException;
 use Xefi\LaravelPasskey\Exceptions\MissingRsaParametersException;
@@ -15,7 +15,7 @@ use Xefi\LaravelPasskey\Exceptions\MissingRsaParametersException;
  * - COSE Algorithm Identifiers: https://www.rfc-editor.org/rfc/rfc8152.html#section-8.1
  * - IANA COSE Algorithms Registry: https://www.iana.org/assignments/cose/cose.xhtml
  */
-enum PasskeyAlgorithm: int
+enum Algorithm: int
 {
     /**
      * ECDSA with P-256 and SHA-256 (COSE algorithm ID: -7)
