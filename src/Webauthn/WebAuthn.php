@@ -2,6 +2,7 @@
 
 namespace Xefi\LaravelPasskey\Webauthn;
 
+use Xefi\LaravelPasskey\Support\Utils;
 use Xefi\LaravelPasskey\Models\Passkey;
 use Xefi\LaravelPasskey\Exceptions\InvalidCoseKeyException;
 use Xefi\LaravelPasskey\Exceptions\InvalidSignatureException;
@@ -73,7 +74,7 @@ final class WebAuthn
         string $email,
         string $display_name
     ): array {
-        $challenge = $this->generate_challenge();
+        $challenge = Utils::generate_challenge();
 
         return [
             'challenge' => $challenge,
@@ -158,7 +159,7 @@ final class WebAuthn
 
         $this->validate_client_data($client_data, 'webauthn.create');
 
-        $attestation_raw = $this->decode_base64_url($attestation_object);
+        $attestation_raw = Utils::decode_base64_url($attestation_object);
 
         // Use CBOR library to decode attestation object
         $stream = new \CBOR\StringStream($attestation_raw);
@@ -167,8 +168,12 @@ final class WebAuthn
         // Convert CBOR map to array
         if ($attestation_map instanceof \CBOR\MapObject) {
             $attestation_array = [];
-            foreach ($attestation_map as $key => $value) {
-                $attestation_array[$key] = $value;
+            foreach ($attestation_map as $mapItem) {
+                if ($mapItem instanceof \CBOR\MapItem) {
+                    $keyObj = $mapItem->getKey();
+                    $key = $keyObj instanceof \CBOR\TextStringObject ? $keyObj->getValue() : (string) $keyObj;
+                    $attestation_array[$key] = $mapItem->getValue();
+                }
             }
         } else {
             throw new InvalidAttestationFormatException();
@@ -229,9 +234,9 @@ final class WebAuthn
 
         $this->validate_client_data($client_data, 'webauthn.get');
 
-        $auth_data = $this->decode_base64_url($authenticator_data);
+        $auth_data = Utils::decode_base64_url($authenticator_data);
 
-        $signature = $this->decode_base64_url($signature);
+        $signature = Utils::decode_base64_url($signature);
 
         $client_data_hash = hash('sha256', base64_decode($client_data_json), true);
 
@@ -306,44 +311,7 @@ final class WebAuthn
         }
     }
 
-    /**
-     * Generate a cryptographically secure random challenge.
-     * 
-     * Creates a base64url-encoded random challenge for use in credential creation
-     * and authentication ceremonies.
-     * 
-     * References:
-     * - WebAuthn Level 2 § 13.4.3: Cryptographic Challenges
-     *   https://www.w3.org/TR/webauthn-2/#sctn-cryptographic-challenges
-     * - RFC 4648 § 5: Base64url Encoding
-     *   https://www.rfc-editor.org/rfc/rfc4648.html#section-5
-     * 
-     * @return string Base64url-encoded challenge (no padding)
-     */
-    public function generate_challenge(): string
-    {
-        $length = config('passkey.challenge_length', 32);
-        return rtrim(strtr(base64_encode(random_bytes($length)), '+/', '-_'), '=');
-    }
 
-    /**
-     * Decode a base64url-encoded string.
-     * 
-     * Converts base64url encoding (URL-safe, no padding) to standard base64
-     * and decodes it to binary data.
-     * 
-     * References:
-     * - RFC 4648 § 5: Base 64 Encoding with URL and Filename Safe Alphabet
-     *   https://www.rfc-editor.org/rfc/rfc4648.html#section-5
-     * 
-     * @param string $input Base64url-encoded string
-     * @return string Decoded binary data
-     */
-    public function decode_base64_url(string $input): string
-    {
-        $input .= str_repeat('=', (4 - strlen($input) % 4) % 4);
-        return base64_decode(strtr($input, '-_', '+/'), true);
-    }
 
     /**
      * Validate the client data JSON structure and type.
@@ -490,12 +458,7 @@ final class WebAuthn
         // Convert base64url to base64 standard for database lookup
         // The client sends base64url (- and _ chars, no padding)
         // But we store base64 standard (+ and / chars, with padding)
-        $credentialIdBase64 = str_pad(
-            strtr($credentialIdBase64Url, '-_', '+/'),
-            strlen($credentialIdBase64Url) + (4 - strlen($credentialIdBase64Url) % 4) % 4,
-            '=',
-            STR_PAD_RIGHT
-        );
+        $credentialIdBase64 = Utils::convert_base64url_to_base64($credentialIdBase64Url);
 
         // Find the passkey by credential_id (base64 standard format)
         $passkey = Passkey::where('credential_id', $credentialIdBase64)->first();

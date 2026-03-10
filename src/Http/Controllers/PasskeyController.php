@@ -103,7 +103,10 @@ class PasskeyController extends Controller
     {
         $validated = $request->validated();
 
-        $passkey = Passkey::query()->where('credential_id', $validated['credential_id'])->first();
+        // Convert base64url to base64 standard for database lookup
+        $credentialIdBase64 = \Xefi\LaravelPasskey\Support\Utils::convert_base64url_to_base64($validated['credential_id']);
+
+        $passkey = Passkey::query()->where('credential_id', $credentialIdBase64)->first();
 
         if (is_null($passkey)) {
             throw new PasskeyNotFoundException();
