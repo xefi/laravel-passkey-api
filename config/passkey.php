@@ -27,4 +27,18 @@ return [
     */
 
     'user_model' => env('PASSKEY_USER_MODEL', 'App\Models\User'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Middleware Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Define the middleware groups for the passkey routes.
+    |
+    */
+
+    'middleware' => [
+        'default' => ['api'],
+        'auth' => ['auth:sanctum'],
+    ],
 ];

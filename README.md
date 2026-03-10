@@ -1,4 +1,4 @@
-# Laravel Passkey
+# Laravel Passkey API
 
 A Laravel package for passkey (WebAuthn) authentication.
 
@@ -6,17 +6,19 @@ A Laravel package for passkey (WebAuthn) authentication.
 
 - PHP 8.1+ (Note: Laravel 11/12 requires PHP 8.2+)
 - Laravel 10.x, 11.x, or 12.x
-- [Laravel Sanctum](https://laravel.com/docs/sanctum)
 - `spomky-labs/cbor-php`: for CBOR decoding
 - `web-auth/cose-lib`: for COSE key handling
 - `openssl` PHP extension
+
+> [!TIP]
+> [Laravel Sanctum](https://laravel.com/docs/sanctum) is suggested if you want to use the default token-based authentication session, but it is not a hard requirement.
 
 ## Installation
 
 Install the package via Composer:
 
 ```bash
-composer require xefi/laravel-passkey
+composer require xefi/laravel-passkey-api
 ```
 
 The package will automatically register its service provider through Laravel's package auto-discovery.
@@ -45,6 +47,7 @@ This creates `config/passkey.php` where you can customize:
 - `timeout`: Passkey operation timeout in milliseconds (default: `60000`, env: `PASSKEY_TIMEOUT`)
 - `challenge_length`: Length of the challenge in bytes (default: `32`, env: `PASSKEY_CHALLENGE_LENGTH`)
 - `user_model`: The User model class (default: `App\Models\User`, env: `PASSKEY_USER_MODEL`)
+- `middleware`: The middleware to apply to passkey routes. You can customize the `auth` middleware (default: `auth:sanctum`).
 
 ### User Model Setup
 
@@ -281,7 +284,7 @@ flowchart TD
     Validation --> Controller
 
     Controller["PasskeyController\n(Thin Layer)\n— Throws Exceptions"]
-    Service["WebAuthnService\n(Business Logic)\n— Parsing CBOR\n— Verify COSE / OpenSSL\n— Data Extraction"]
+    Service["WebAuthn\n(Business Logic)\n— Parsing CBOR\n— Verify COSE / OpenSSL\n— Data Extraction"]
 
     Service --> Controller
     Controller --> Model

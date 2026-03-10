@@ -17,7 +17,7 @@ Route::prefix('api/passkeys')->group(function () {
     Route::post('/login', [\Xefi\LaravelPasskey\Http\Controllers\PasskeyController::class, 'auth']);
 });
 
-Route::prefix('api/passkeys')->middleware('auth')->group(function () {
+Route::prefix('api/passkeys')->middleware(config('passkey.middleware.auth', ['auth:sanctum']))->group(function () {
     Route::get('/', [\Xefi\LaravelPasskey\Http\Controllers\PasskeyController::class, 'index']);
     Route::post('/register/options', [\Xefi\LaravelPasskey\Http\Controllers\PasskeyController::class, 'registerOptions']);
     Route::post('/register', [\Xefi\LaravelPasskey\Http\Controllers\PasskeyController::class, 'register']);
