@@ -266,6 +266,25 @@ foreach ($passkeys as $passkey) {
 }
 ```
 
+## Testing
+
+This package comes with a fully isolated Docker environment to ensure tests run consistently without requiring a local PHP installation.
+
+To run the test suite, simply use the provided `make` commands:
+
+```bash
+# Run the test suite
+make test
+
+# Run tests and generate an HTML code coverage report (in the /coverage directory)
+make test-coverage
+
+# Open a bash shell inside the PHP container for debugging
+make bash
+```
+
+> [!NOTE]
+> The `make test` and `make test-coverage` commands will automatically build the Docker image and install Composer dependencies if they are missing. You can force this installation step manually using `make setup`.
 
 ## Architecture Pattern
 
