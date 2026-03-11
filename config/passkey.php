@@ -18,18 +18,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | User Model
-    |--------------------------------------------------------------------------
-    |
-    | The User model class to use for passkey relationships.
-    | Override this if you use a custom User model.
-    |
-    */
-
-    'user_model' => env('PASSKEY_USER_MODEL', 'App\Models\User'),
-
-    /*
-    |--------------------------------------------------------------------------
     | Middleware Configuration
     |--------------------------------------------------------------------------
     |

@@ -400,20 +400,20 @@ final class WebAuthn
     }
 
     /**
-     * Register a new passkey for a user.
+     * Register a new passkey for an owning model.
      * 
      * Processes the registration response from the authenticator, validates the data,
-     * and persists the passkey to the database.
+     * and persists the passkey via the polymorphic relation of the owner model.
      * 
      * References:
      * - WebAuthn Level 2 § 7.1: Registering a New Credential
      *   https://www.w3.org/TR/webauthn-2/#sctn-registering-a-new-credential
      * 
      * @param array $validated Validated registration response data
-     * @param mixed $userId User identifier
+     * @param \Illuminate\Database\Eloquent\Model $owner The model that owns the passkey
      * @return Passkey Created passkey model instance
      */
-    public function registerPasskey(array $validated, $userId): Passkey
+    public function registerPasskey(array $validated, \Illuminate\Database\Eloquent\Model $owner): Passkey
     {
         // Extract challenge from clientDataJSON
         $challenge = $this->get_challenge_from_client_data_json(
@@ -426,9 +426,9 @@ final class WebAuthn
             $validated['response']['attestationObject']
         );
 
-        // Create and persist the passkey
-        $passkey = Passkey::create([
-            'user_id' => $userId,
+        // Create and persist the passkey via the polymorphic relation
+        /** @var Passkey $passkey */
+        $passkey = $owner->passkeys()->create([
             'label' => $validated['label'] ?? 'Default Passkey',
             'credential_id' => $parsed['credential_id'],
             'challenge' => $challenge,

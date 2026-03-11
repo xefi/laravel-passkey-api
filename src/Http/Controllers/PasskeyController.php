@@ -26,7 +26,7 @@ class PasskeyController extends Controller
     }
 
     /**
-     * Get a list of passkeys for the authenticated user.
+     * Get a list of passkeys for the authenticated model.
      *
      * @param IndexRequest $request
      * @return JsonResponse
@@ -35,8 +35,8 @@ class PasskeyController extends Controller
     {
         $user = $request->user();
 
-        $passkeys = Passkey::query()->where('user_id', $user->id)
-            ->get(['id', 'user_id', 'label', 'credential_id', 'created_at']);
+        $passkeys = $user->passkeys()
+            ->get(['id', 'label', 'credential_id', 'created_at']);
 
         return response()->json($passkeys);
     }
@@ -80,7 +80,7 @@ class PasskeyController extends Controller
 
         $passkey = $this->passkey->registerPasskey(
             $validated,
-            $request->user()->id
+            $request->user()
         );
 
         return response()->json([
@@ -141,13 +141,14 @@ class PasskeyController extends Controller
         );
 
         return response()->json([
-            'user' => ['id' => $passkey->user_id],
+            'passkeeable_id' => $passkey->passkeeable_id,
+            'passkeeable_type' => $passkey->passkeeable_type,
             'passkey' => ['id' => $passkey->id],
         ]);
     }
 
     /**
-     * Authenticate a user with a passkey and create a session.
+     * Authenticate a model with a passkey and create a session (Sanctum token).
      *
      * @param VerifyRequest $request
      * @return JsonResponse
@@ -161,7 +162,7 @@ class PasskeyController extends Controller
             $validated['response']
         );
 
-        $user = $passkey->user;
+        $user = $passkey->passkeeable;
 
         if (!$user) {
             throw new UserNotFoundException();

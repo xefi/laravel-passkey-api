@@ -12,18 +12,13 @@ return new class extends Migration {
     {
         Schema::create('passkeys', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('user_id');
+            $table->morphs('passkeeable');
             $table->string('label');
             $table->text('credential_id');
             $table->string('challenge');
             $table->text('public_key');
             $table->timestamps();
 
-            $table->foreign('user_id')
-                ->references('id')
-                ->on('users');
-
-            $table->index('user_id');
             $table->index('credential_id');
         });
     }

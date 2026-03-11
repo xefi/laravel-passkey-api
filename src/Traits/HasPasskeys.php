@@ -2,7 +2,7 @@
 
 namespace Xefi\LaravelPasskey\Traits;
 
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Xefi\LaravelPasskey\Models\Passkey;
 
 trait HasPasskeys
@@ -14,18 +14,18 @@ trait HasPasskeys
      */
     protected static function bootHasPasskeys(): void
     {
-        static::deleting(function ($user) {
-            $user->passkeys()->delete();
+        static::deleting(function ($model) {
+            $model->passkeys()->delete();
         });
     }
 
     /**
-     * Get all of the user's passkeys.
+     * Get all of the model's passkeys.
      *
-     * @return HasMany
+     * @return MorphMany
      */
-    public function passkeys(): HasMany
+    public function passkeys(): MorphMany
     {
-        return $this->hasMany(Passkey::class, 'user_id');
+        return $this->morphMany(Passkey::class, 'passkeeable');
     }
 }
