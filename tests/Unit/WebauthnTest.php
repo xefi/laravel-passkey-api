@@ -2,7 +2,7 @@
 
 namespace Xefi\LaravelPasskey\Tests\Unit\Webauthn;
 
-use PHPUnit\Framework\TestCase;
+use Xefi\LaravelPasskey\Tests\TestCase;
 use Xefi\LaravelPasskey\Webauthn\WebAuthn;
 use Xefi\LaravelPasskey\Exceptions\MalformedClientDataException;
 
@@ -19,18 +19,8 @@ class WebAuthnTest extends TestCase
 
         $this->webAuthn = new WebAuthn();
 
-        if (!function_exists('config')) {
-            function config($key = null, $default = null)
-            {
-                if ($key === 'passkey.timeout') {
-                    return 600000;
-                }
-                if ($key === 'passkey.challenge_length') {
-                    return 32;
-                }
-                return $default;
-            }
-        }
+        config(['passkey.timeout' => 600000]);
+        config(['passkey.challenge_length' => 32]);
     }
 
     /**

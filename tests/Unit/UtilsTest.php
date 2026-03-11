@@ -2,7 +2,7 @@
 
 namespace Xefi\LaravelPasskey\Tests\Unit\Support;
 
-use PHPUnit\Framework\TestCase;
+use Xefi\LaravelPasskey\Tests\TestCase;
 
 use Xefi\LaravelPasskey\Support\Utils;
 
@@ -52,18 +52,7 @@ class UtilsTest extends TestCase
     public function test_can_generate_challenge()
     {
         // Arrange
-        if (!function_exists('config')) {
-            function config($key = null, $default = null)
-            {
-                if ($key === 'passkey.timeout') {
-                    return 600000;
-                }
-                if ($key === 'passkey.challenge_length') {
-                    return 32;
-                }
-                return $default ?? 32;
-            }
-        }
+        config(['passkey.challenge_length' => 32]);
 
         // Act
         $challenge = Utils::generate_challenge();
