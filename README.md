@@ -4,8 +4,8 @@ A Laravel package for passkey (WebAuthn) authentication.
 
 ## Requirements
 
-- PHP 8.1+ (Note: Laravel 11/12 requires PHP 8.2+)
-- Laravel 10.x, 11.x, or 12.x
+- PHP 8.1+ (Note: Laravel 11/12/13 may require newer PHP versions depending on the framework release)
+- Laravel 10.x, 11.x, 12.x, or 13.x
 - `spomky-labs/cbor-php`: for CBOR decoding
 - `web-auth/cose-lib`: for COSE key handling
 - `openssl` PHP extension
