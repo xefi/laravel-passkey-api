@@ -27,6 +27,8 @@ return [
 
     'middleware' => [
         'default' => ['api'],
-        'auth' => ['auth:sanctum'],
+        'auth' => [
+            // 'auth:sanctum'
+        ],
     ],
 ];
