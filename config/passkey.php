@@ -18,13 +18,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | User Model
+    | Middleware Configuration
     |--------------------------------------------------------------------------
     |
-    | The User model class to use for passkey relationships.
-    | Override this if you use a custom User model.
+    | Define the middleware groups for the passkey routes.
     |
     */
 
-    'user_model' => env('PASSKEY_USER_MODEL', 'App\Models\User'),
+    'middleware' => [
+        'default' => ['api'],
+        'auth' => [
+            // 'auth:sanctum'
+        ],
+    ],
 ];

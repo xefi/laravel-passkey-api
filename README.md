@@ -1,22 +1,24 @@
-# Laravel Passkey
+# Laravel Passkey API
 
 A Laravel package for passkey (WebAuthn) authentication.
 
 ## Requirements
 
-- PHP 8.1+ (Note: Laravel 11/12 requires PHP 8.2+)
-- Laravel 10.x, 11.x, or 12.x
-- [Laravel Sanctum](https://laravel.com/docs/sanctum)
+- PHP 8.1+ (Note: Laravel 11/12/13 may require newer PHP versions depending on the framework release)
+- Laravel 10.x, 11.x, 12.x, or 13.x
 - `spomky-labs/cbor-php`: for CBOR decoding
 - `web-auth/cose-lib`: for COSE key handling
 - `openssl` PHP extension
+
+> [!TIP]
+> [Laravel Sanctum](https://laravel.com/docs/sanctum) is suggested if you want to use the default token-based authentication session, but it is not a hard requirement.
 
 ## Installation
 
 Install the package via Composer:
 
 ```bash
-composer require thomyris/laravel-passkey
+composer require xefi/laravel-passkey-api
 ```
 
 The package will automatically register its service provider through Laravel's package auto-discovery.
@@ -41,16 +43,18 @@ php artisan vendor:publish --tag=passkey-config
 ```
 
 This creates `config/passkey.php` where you can customize:
-- `user_model`: The User model class (default: `App\Models\User`)
-- `timeout`: Passkey operation timeout in milliseconds
-- `challenge_length`: Length of the challenge in bytes
+- `enabled`: Enable/disable the passkey package (default: `true`, env: `PASSKEY_ENABLED`)
+- `timeout`: Passkey operation timeout in milliseconds (default: `60000`, env: `PASSKEY_TIMEOUT`)
+- `challenge_length`: Length of the challenge in bytes (default: `32`, env: `PASSKEY_CHALLENGE_LENGTH`)
+- `user_model`: The User model class (default: `App\Models\User`, env: `PASSKEY_USER_MODEL`)
+- `middleware`: The middleware to apply to passkey routes. You can customize the `auth` middleware (default: `auth:sanctum`).
 
 ### User Model Setup
 
 Add the `HasPasskeys` trait to your User model:
 
 ```php
-use Thomyris\LaravelPasskey\Traits\HasPasskeys;
+use Xefi\LaravelPasskey\Traits\HasPasskeys;
 
 class User extends Authenticatable
 {
@@ -76,7 +80,7 @@ Returns a list of passkeys registered for the authenticated user.
 
 #### Get Registration Options
 ```http
-POST /api/passkeys/register_options
+POST /api/passkeys/register/options
 Authorization: Bearer <token>
 Content-Type: application/json
 ```
@@ -143,7 +147,6 @@ Registers a new passkey credential and persists it to the database.
 **Response:**
 ```json
 {
-  "message": "Passkey registered successfully",
   "passkey": {
     "id": 1,
     "label": "My Security Key",
@@ -157,11 +160,33 @@ Registers a new passkey credential and persists it to the database.
 
 #### Get Verification Options
 ```http
-POST /api/passkeys/verify_options
+POST /api/passkeys/verify/options
 Content-Type: application/json
 ```
 
 Returns options needed to verify a passkey credential (challenge and allowed credentials).
+
+**Request Body:**
+```json
+{
+  "credential_id": "base64-encoded-credential-id"
+}
+```
+
+**Response:**
+```json
+{
+  "challenge": "base64-encoded-challenge",
+  "allowCredentials": [
+    {
+      "id": "base64-encoded-credential-id",
+      "type": "public-key"
+    }
+  ],
+  "timeout": 60000,
+  "userVerification": "preferred"
+}
+```
 
 #### Verify Passkey
 ```http
@@ -185,9 +210,21 @@ Verifies a passkey authentication attempt without creating a session. Useful for
 }
 ```
 
+**Response:**
+```json
+{
+  "user": {
+    "id": 1
+  },
+  "passkey": {
+    "id": 1
+  }
+}
+```
+
 #### Authenticate (Login)
 ```http
-POST /api/passkeys/auth
+POST /api/passkeys/login
 Content-Type: application/json
 ```
 
@@ -198,7 +235,6 @@ Authenticates a user via passkey and returns a Sanctum token.
 **Response:**
 ```json
 {
-  "message": "Authentication successful",
   "user": {
     "id": 1,
     "name": "User Name",
@@ -230,94 +266,100 @@ foreach ($passkeys as $passkey) {
 }
 ```
 
+## Testing
+
+This package comes with a fully isolated Docker environment to ensure tests run consistently without requiring a local PHP installation.
+
+To run the test suite, simply use the provided `make` commands:
+
+```bash
+# Run the test suite
+make test
+
+# Run tests and generate an HTML code coverage report (in the /coverage directory)
+make test-coverage
+
+# Open a bash shell inside the PHP container for debugging
+make bash
+```
+
+> [!NOTE]
+> The `make test` and `make test-coverage` commands will automatically build the Docker image and install Composer dependencies if they are missing. You can force this installation step manually using `make setup`.
 
 ## Architecture Pattern
 
 This library follows a clean, service-oriented architecture to maintain the **Single Responsibility Principle**:
 
-```text
-    [ HTTP Request ]
-           |
-           v
-  +------------------+       +-------------------+
-  | PasskeyRoute     |------>| RegisterRequest   | (Validation)
-  | (api.php)        |       | VerifyRequest     |
-  +------------------+       +-------------------+
-           |
-           v
-  +-----------------------+      +-----------------------+
-  | PasskeyController     | <----| WebAuthnService       | (Business Logic)
-  | (Thin Layer)          |      |-----------------------|
-  +-----------------------+      | - Parsing (CBOR)      |
-           |                     | - Verify (COSE/OpenSSL)|
-           |                     | - Data Extraction     |
-           v                     +-----------------------+
-  +-----------------------+                  |
-  | Passkey Model         | <----------------+
-  | (Persistence)         |
-  +-----------------------+
-           |
-           | (via HasPasskeys Trait)
-           v
-  +-----------------------+
-  | User Model            |
-  | (App\Models\User)     |
-  +-----------------------+
+```mermaid
+flowchart TD
+    HTTP([HTTP Request])
+
+    HTTP --> Route
+
+    Route["PasskeyRoute\n(api.php)"]
+    Route --> Validation
+
+    Validation["FormRequest Validation\nRegisterRequest / VerifyRequest"]
+    Validation --> Controller
+
+    Controller["PasskeyController\n(Thin Layer)\n— Throws Exceptions"]
+    Service["WebAuthn\n(Business Logic)\n— Parsing CBOR\n— Verify COSE / OpenSSL\n— Data Extraction"]
+
+    Service --> Controller
+    Controller --> Model
+
+    Model["Passkey Model\n(Persistence)"]
+    Model --> User
+
+    User["User Model\n(App\\Models\\User)\nvia HasPasskeys Trait"]
 ```
+
+> [!NOTE]
+> The controller uses Laravel's exception handling mechanism. Errors are thrown as exceptions (`AuthenticationException`, `PasskeyNotFoundException`, `UserNotFoundException`, etc.) rather than returning JSON error responses directly.
 
 ## Typical Sequence Flow
 
 Here is the typical sequence of interactions between the Client (Browser), the Server (API), and the Authenticator (Security Key, TouchID, etc.):
 
-```text
-     USER            BROWSER (JS)           SERVER (API)        AUTHENTICATOR
-      |                  |                      |                     |
-      |  1. Initial Login|                      |                     |
-      |----------------->|      POST /login     |                     |
-      | (App Logic)      |--------------------->|                     |
-      |                  |   <-- Sanctum Token  |                     |
-      |                  |<---------------------|                     |
-      |                  |                      |                     |
-      |  2. Register     |                      |                     |
-      |----------------->| POST /api/passkeys/register_options        |
-      |                  |--------------------->|                     |
-      |                  |  <-- Reg Options     |                     |
-      |                  |<---------------------|                     |
-      |                  |                      |                     |
-      |                  |  navigator.create()  |                     |
-      |                  |------------------------------------------->|
-      |                  |                      |  3. Fingerprint     |
-      |                  |                      | <------------------ |
-      |  User Interaction|                      |                     |
-      | <----------------|                      |                     |
-      | ---------------->|                      |                     |
-      |                  |                      |  4. Attestation     |
-      |                  | <----------------------------------------- |
-      |                  |                      |                     |
-      |                  | POST /api/passkeys/register                |
-      |                  |--------------------->|                     |
-      |                  |   <-- Success        |                     |
-      |                  |<---------------------|                     |
-      |                  |                      |                     |
-      |  5. Auth (Login) |                      |                     |
-      |----------------->| POST /api/passkeys/verify_options          |
-      |                  |--------------------->|                     |
-      |                  |  <-- Auth Options    |                     |
-      |                  |<---------------------|                     |
-      |                  |                      |                     |
-      |                  |    navigator.get()   |                     |
-      |                  |------------------------------------------->|
-      |                  |                      |  6. Fingerprint     |
-      |                  |                      | <------------------ |
-      |  User Interaction|                      |                     |
-      | <----------------|                      |                     |
-      | ---------------->|                      |                     |
-      |                  |                      |  7. Assertion       |
-      |                  | <----------------------------------------- |
-      |                  |                      |                     |
-      |                  | POST /api/passkeys/auth                    |
-      |                  |--------------------->|                     |
-      |                  |   <-- NEW Token      |                     |
-      |                  |<---------------------|                     |
-      |                  |                      |                     |
+```mermaid
+sequenceDiagram
+    actor User
+    participant Browser as Browser (JS)
+    participant Server as Server (API)
+    participant Auth as Authenticator
+
+    Note over User,Auth: 1. Initial Login (App Logic)
+    User->>Browser: Login
+    Browser->>Server: POST /login
+    Server-->>Browser: Sanctum Token
+
+    Note over User,Auth: 2. Register Passkey
+    User->>Browser: Register
+    Browser->>Server: POST /api/passkeys/register/options
+    Server-->>Browser: Registration Options
+
+    Browser->>Auth: navigator.credentials.create()
+    Note over Auth: 3. Fingerprint / Biometric
+    Auth-->>User: Prompt
+    User-->>Auth: Confirm
+    Note over Auth: 4. Attestation
+    Auth-->>Browser: Attestation Object
+
+    Browser->>Server: POST /api/passkeys/register
+    Server-->>Browser: Success
+
+    Note over User,Auth: 5. Authentication (Login)
+    User->>Browser: Login with Passkey
+    Browser->>Server: POST /api/passkeys/verify/options
+    Server-->>Browser: Authentication Options
+
+    Browser->>Auth: navigator.credentials.get()
+    Note over Auth: 6. Fingerprint / Biometric
+    Auth-->>User: Prompt
+    User-->>Auth: Confirm
+    Note over Auth: 7. Assertion
+    Auth-->>Browser: Assertion Object
+
+    Browser->>Server: POST /api/passkeys/login
+    Server-->>Browser: NEW Sanctum Token
 ```

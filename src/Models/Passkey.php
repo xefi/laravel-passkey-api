@@ -1,23 +1,24 @@
 <?php
 
-namespace Thomyris\LaravelPasskey\Models;
+namespace Xefi\LaravelPasskey\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
  * Passkey Model
- * 
+ *
  * @property int $id
- * @property int $user_id
+ * @property int $passkeeable_id
+ * @property string $passkeeable_type
  * @property string $label
  * @property string $credential_id
  * @property string $challenge
  * @property string $public_key
  * @property \Illuminate\Support\Carbon $created_at
  * @property \Illuminate\Support\Carbon $updated_at
- * 
- * @property-read \Illuminate\Foundation\Auth\User $user
+ *
+ * @property-read \Illuminate\Database\Eloquent\Model $passkeeable
  */
 class Passkey extends Model
 {
@@ -28,19 +29,23 @@ class Passkey extends Model
      */
     protected $fillable = [
         'label',
-        'user_id',
+        'passkeeable_id',
+        'passkeeable_type',
         'credential_id',
         'challenge',
         'public_key',
     ];
 
     /**
-     * Get the user that owns the passkey.
+     * Get the owning passkeeable model (User, Admin, Client, etc.).
      *
-     * @return BelongsTo
+     * Any model using the HasPasskeys trait can own passkeys via this
+     * polymorphic relationship.
+     *
+     * @return MorphTo
      */
-    public function user(): BelongsTo
+    public function passkeeable(): MorphTo
     {
-        return $this->belongsTo(config('passkey.user_model', 'App\Models\User'));
+        return $this->morphTo();
     }
 }

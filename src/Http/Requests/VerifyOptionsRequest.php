@@ -1,6 +1,6 @@
 <?php
 
-namespace Thomyris\LaravelPasskey\Http\Requests;
+namespace Xefi\LaravelPasskey\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -13,6 +13,8 @@ class VerifyOptionsRequest extends FormRequest
 
     public function rules(): array
     {
-        return [];
+        return [
+            'credential_id' => ['required', 'string'],
+        ];
     }
 }

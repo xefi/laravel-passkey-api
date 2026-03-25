@@ -1,6 +1,6 @@
 <?php
 
-namespace Thomyris\LaravelPasskey\Http\Requests;
+namespace Xefi\LaravelPasskey\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -14,14 +14,14 @@ class VerifyRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'id' => 'required|string',
-            'rawId' => 'required|string',
-            'type' => 'required|string|in:public-key',
-            'response' => 'required|array',
-            'response.clientDataJSON' => 'required|string',
-            'response.authenticatorData' => 'required|string',
-            'response.signature' => 'required|string',
-            'response.userHandle' => 'nullable|string',
+            'id' => ['required', 'string'],
+            'rawId' => ['required', 'string'],
+            'type' => ['required', 'string', 'in:public-key'],
+            'response' => ['required', 'array'],
+            'response.clientDataJSON' => ['required', 'string'],
+            'response.authenticatorData' => ['required', 'string'],
+            'response.signature' => ['required', 'string'],
+            'response.userHandle' => ['nullable', 'string'],
         ];
     }
 

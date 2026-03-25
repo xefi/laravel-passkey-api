@@ -1,19 +1,31 @@
 <?php
 
-namespace Thomyris\LaravelPasskey\Traits;
+namespace Xefi\LaravelPasskey\Traits;
 
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Thomyris\LaravelPasskey\Models\Passkey;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Xefi\LaravelPasskey\Models\Passkey;
 
 trait HasPasskeys
 {
     /**
-     * Get all of the user's passkeys.
+     * The "booting" method of the trait.
      *
-     * @return HasMany
+     * @return void
      */
-    public function passkeys(): HasMany
+    protected static function bootHasPasskeys(): void
     {
-        return $this->hasMany(Passkey::class, 'user_id');
+        static::deleting(function ($model) {
+            $model->passkeys()->delete();
+        });
+    }
+
+    /**
+     * Get all of the model's passkeys.
+     *
+     * @return MorphMany
+     */
+    public function passkeys(): MorphMany
+    {
+        return $this->morphMany(Passkey::class, 'passkeeable');
     }
 }
