@@ -1,57 +1,31 @@
-# Laravel Passkey API
+# Laravel Passkey
 
-A Laravel package for passkey (WebAuthn) authentication.
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/xefi/laravel-passkey-api.svg?style=flat-square)](https://packagist.org/packages/xefi/laravel-passkey-api)
+[![Tests](https://github.com/xefi/laravel-passkey-api/actions/workflows/tests.yml/badge.svg)](https://github.com/xefi/laravel-passkey-api/actions/workflows/tests.yml)
+[![License](https://img.shields.io/packagist/l/xefi/laravel-passkey-api.svg?style=flat-square)](LICENSE)
+
+A Laravel package for **passkey (WebAuthn/FIDO2)** authentication — register and verify passkeys through a clean REST API, with a swappable authentication action to support Sanctum, Passport, web sessions, or any custom guard.
+
+Full documentation at **[laravel-passkey.xefi.com](https://laravel-passkey.xefi.com/)**.
+
+---
 
 ## Requirements
 
-- PHP 8.1+ (Note: Laravel 11/12/13 may require newer PHP versions depending on the framework release)
-- Laravel 10.x, 11.x, 12.x, or 13.x
-- `spomky-labs/cbor-php`: for CBOR decoding
-- `web-auth/cose-lib`: for COSE key handling
-- `openssl` PHP extension
+- PHP `^8.3`
+- Laravel `^12.0` or `^13.0`
 
-> [!TIP]
-> [Laravel Sanctum](https://laravel.com/docs/sanctum) is suggested if you want to use the default token-based authentication session, but it is not a hard requirement.
+---
 
 ## Installation
 
-Install the package via Composer:
-
 ```bash
 composer require xefi/laravel-passkey-api
-```
-
-The package will automatically register its service provider through Laravel's package auto-discovery.
-
-### Database Setup
-
-Publish and run the migrations:
-
-```bash
 php artisan vendor:publish --tag=passkey-migrations
 php artisan migrate
 ```
 
-This will create a `passkeys` table to store passkey credentials.
-
-### Configuration
-
-Optionally publish the configuration file:
-
-```bash
-php artisan vendor:publish --tag=passkey-config
-```
-
-This creates `config/passkey.php` where you can customize:
-- `enabled`: Enable/disable the passkey package (default: `true`, env: `PASSKEY_ENABLED`)
-- `timeout`: Passkey operation timeout in milliseconds (default: `60000`, env: `PASSKEY_TIMEOUT`)
-- `challenge_length`: Length of the challenge in bytes (default: `32`, env: `PASSKEY_CHALLENGE_LENGTH`)
-- `user_model`: The User model class (default: `App\Models\User`, env: `PASSKEY_USER_MODEL`)
-- `middleware`: The middleware to apply to passkey routes. You can customize the `auth` middleware (default: `auth:sanctum`).
-
-### User Model Setup
-
-Add the `HasPasskeys` trait to your User model:
+Add the `HasPasskeys` trait to your `User` model:
 
 ```php
 use Xefi\LaravelPasskey\Traits\HasPasskeys;
@@ -59,267 +33,73 @@ use Xefi\LaravelPasskey\Traits\HasPasskeys;
 class User extends Authenticatable
 {
     use HasPasskeys;
-
-    // ... existing code
 }
 ```
+
+---
+
+## Configuration
+
+```bash
+php artisan vendor:publish --tag=passkey-config
+```
+
+Key options in `config/passkey.php`:
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `enabled` | `true` | Enable / disable the package |
+| `timeout` | `60000` | WebAuthn operation timeout (ms) |
+| `challenge_length` | `32` | Challenge size in bytes |
+| `user_model` | `App\Models\User` | Authenticatable model |
+| `auth_action` | `CreateWebSessionAction` | Action invoked on successful login |
+
+---
+
+## Authentication Actions
+
+The login endpoint delegates to a swappable action class. Three are provided out of the box:
+
+```php
+// config/passkey.php
+
+// Web session (default)
+'auth_action' => \Xefi\LaravelPasskey\Actions\CreateWebSessionAction::class,
+
+// Laravel Sanctum token
+'auth_action' => \Xefi\LaravelPasskey\Actions\CreateSanctumTokenAction::class,
+
+// Laravel Passport token
+'auth_action' => \Xefi\LaravelPasskey\Actions\CreatePassportTokenAction::class,
+```
+
+You can also bind your own implementation of `Xefi\LaravelPasskey\Contracts\PasskeyAuthAction`.
+
+---
 
 ## API Endpoints
 
-The package provides several API endpoints for passkey management and authentication:
+### Passkey Management *(requires authentication)*
 
-### Passkey Management (require authentication)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/passkeys` | List passkeys for the authenticated user |
+| `POST` | `/api/passkeys/register/options` | Get registration options |
+| `POST` | `/api/passkeys/register` | Register a new passkey |
 
-#### List Passkeys
-```http
-GET /api/passkeys
-Authorization: Bearer <token>
-```
+### Authentication *(public)*
 
-Returns a list of passkeys registered for the authenticated user.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/passkeys/verify/options` | Get verification options |
+| `POST` | `/api/passkeys/verify` | Verify a passkey (MFA / re-auth) |
+| `POST` | `/api/passkeys/login` | Authenticate and invoke the auth action |
 
-#### Get Registration Options
-```http
-POST /api/passkeys/register/options
-Authorization: Bearer <token>
-Content-Type: application/json
-```
+Full request/response schemas are available in the **[documentation](https://laravel-passkey.xefi.com/)**.
 
-Returns options needed to create a new passkey credential.
+---
 
-**Request Body:**
-```json
-{
-  "app_name": "My Application",
-  "app_url": "https://example.com"
-}
-```
-
-**Response:**
-```json
-{
-  "challenge": "base64-encoded-challenge",
-  "rp": {
-    "name": "My Application",
-    "id": "example.com"
-  },
-  "user": {
-    "id": "base64-encoded-user-id",
-    "name": "user@example.com",
-    "displayName": "John Doe"
-  },
-  "pubKeyCredParams": [
-    {"type": "public-key", "alg": -7},
-    {"type": "public-key", "alg": -257}
-  ],
-  "timeout": 600000,
-  "attestation": "none",
-  "authenticatorSelection": {
-    "residentKey": "preferred",
-    "userVerification": "preferred"
-  }
-}
-```
-
-#### Register Passkey
-```http
-POST /api/passkeys/register
-Authorization: Bearer <token>
-Content-Type: application/json
-```
-
-Registers a new passkey credential and persists it to the database.
-
-**Request Body:**
-```json
-{
-  "label": "My Security Key",
-  "id": "credential-id",
-  "rawId": "raw-credential-id",
-  "type": "public-key",
-  "response": {
-    "clientDataJSON": "base64-encoded-client-data",
-    "attestationObject": "base64-encoded-attestation"
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "passkey": {
-    "id": 1,
-    "label": "My Security Key",
-    "credential_id": "base64-encoded-credential-id",
-    "created_at": "2024-01-19T08:50:00.000000Z"
-  }
-}
-```
-
-### Authentication Flow (public)
-
-#### Get Verification Options
-```http
-POST /api/passkeys/verify/options
-Content-Type: application/json
-```
-
-Returns options needed to verify a passkey credential (challenge and allowed credentials).
-
-**Request Body:**
-```json
-{
-  "credential_id": "base64-encoded-credential-id"
-}
-```
-
-**Response:**
-```json
-{
-  "challenge": "base64-encoded-challenge",
-  "allowCredentials": [
-    {
-      "id": "base64-encoded-credential-id",
-      "type": "public-key"
-    }
-  ],
-  "timeout": 60000,
-  "userVerification": "preferred"
-}
-```
-
-#### Verify Passkey
-```http
-POST /api/passkeys/verify
-Content-Type: application/json
-```
-
-Verifies a passkey authentication attempt without creating a session. Useful for MFA or re-authentication.
-
-**Request Body:**
-```json
-{
-  "id": "credential-id",
-  "rawId": "raw-credential-id",
-  "type": "public-key",
-  "response": {
-    "clientDataJSON": "base64-encoded-client-data",
-    "authenticatorData": "base64-encoded-auth-data",
-    "signature": "base64-encoded-signature"
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "user": {
-    "id": 1
-  },
-  "passkey": {
-    "id": 1
-  }
-}
-```
-
-#### Authenticate (Login)
-```http
-POST /api/passkeys/login
-Content-Type: application/json
-```
-
-Authenticates a user via passkey and returns a Sanctum token.
-
-**Request Body:** Same as **Verify Passkey**.
-
-**Response:**
-```json
-{
-  "user": {
-    "id": 1,
-    "name": "User Name",
-    "email": "user@example.com"
-  },
-  "token": "sanctum-plain-text-token"
-}
-```
-
-## Usage
-
-After installation, the package routes will be automatically registered. You can verify the routes are available:
-
-```bash
-php artisan route:list --path=passkeys
-```
-
-### Accessing User Passkeys
-
-You can access a user's passkeys through the relationship:
-
-```php
-$user = User::find(1);
-$passkeys = $user->passkeys;
-
-foreach ($passkeys as $passkey) {
-    echo $passkey->label;
-    echo $passkey->created_at;
-}
-```
-
-## Testing
-
-This package comes with a fully isolated Docker environment to ensure tests run consistently without requiring a local PHP installation.
-
-To run the test suite, simply use the provided `make` commands:
-
-```bash
-# Run the test suite
-make test
-
-# Run tests and generate an HTML code coverage report (in the /coverage directory)
-make test-coverage
-
-# Open a bash shell inside the PHP container for debugging
-make bash
-```
-
-> [!NOTE]
-> The `make test` and `make test-coverage` commands will automatically build the Docker image and install Composer dependencies if they are missing. You can force this installation step manually using `make setup`.
-
-## Architecture Pattern
-
-This library follows a clean, service-oriented architecture to maintain the **Single Responsibility Principle**:
-
-```mermaid
-flowchart TD
-    HTTP([HTTP Request])
-
-    HTTP --> Route
-
-    Route["PasskeyRoute\n(api.php)"]
-    Route --> Validation
-
-    Validation["FormRequest Validation\nRegisterRequest / VerifyRequest"]
-    Validation --> Controller
-
-    Controller["PasskeyController\n(Thin Layer)\n— Throws Exceptions"]
-    Service["WebAuthn\n(Business Logic)\n— Parsing CBOR\n— Verify COSE / OpenSSL\n— Data Extraction"]
-
-    Service --> Controller
-    Controller --> Model
-
-    Model["Passkey Model\n(Persistence)"]
-    Model --> User
-
-    User["User Model\n(App\\Models\\User)\nvia HasPasskeys Trait"]
-```
-
-> [!NOTE]
-> The controller uses Laravel's exception handling mechanism. Errors are thrown as exceptions (`AuthenticationException`, `PasskeyNotFoundException`, `UserNotFoundException`, etc.) rather than returning JSON error responses directly.
-
-## Typical Sequence Flow
-
-Here is the typical sequence of interactions between the Client (Browser), the Server (API), and the Authenticator (Security Key, TouchID, etc.):
+## Typical Flow
 
 ```mermaid
 sequenceDiagram
@@ -328,38 +108,35 @@ sequenceDiagram
     participant Server as Server (API)
     participant Auth as Authenticator
 
-    Note over User,Auth: 1. Initial Login (App Logic)
-    User->>Browser: Login
-    Browser->>Server: POST /login
-    Server-->>Browser: Sanctum Token
-
-    Note over User,Auth: 2. Register Passkey
-    User->>Browser: Register
+    Note over User,Auth: Register Passkey
+    User->>Browser: Initiate registration
     Browser->>Server: POST /api/passkeys/register/options
-    Server-->>Browser: Registration Options
-
+    Server-->>Browser: Registration options + challenge
     Browser->>Auth: navigator.credentials.create()
-    Note over Auth: 3. Fingerprint / Biometric
-    Auth-->>User: Prompt
-    User-->>Auth: Confirm
-    Note over Auth: 4. Attestation
-    Auth-->>Browser: Attestation Object
-
+    Auth-->>Browser: Attestation object
     Browser->>Server: POST /api/passkeys/register
-    Server-->>Browser: Success
+    Server-->>Browser: Passkey stored
 
-    Note over User,Auth: 5. Authentication (Login)
-    User->>Browser: Login with Passkey
+    Note over User,Auth: Login with Passkey
+    User->>Browser: Initiate login
     Browser->>Server: POST /api/passkeys/verify/options
-    Server-->>Browser: Authentication Options
-
+    Server-->>Browser: Authentication options + challenge
     Browser->>Auth: navigator.credentials.get()
-    Note over Auth: 6. Fingerprint / Biometric
-    Auth-->>User: Prompt
-    User-->>Auth: Confirm
-    Note over Auth: 7. Assertion
-    Auth-->>Browser: Assertion Object
-
+    Auth-->>Browser: Assertion object
     Browser->>Server: POST /api/passkeys/login
-    Server-->>Browser: NEW Sanctum Token
+    Server-->>Browser: Session / token
 ```
+
+---
+
+## Support us
+
+[![](https://raw.githubusercontent.com/xefi/art/main/support-landscape.svg)](https://www.xefi.com)
+
+Since 1997, XEFI is a leader in IT performance support for small and medium-sized businesses through its nearly 200 local agencies based in France, Belgium, Switzerland and Spain. A one-stop shop for IT, office automation, software, [digitalization](https://www.xefi.com/solutions-software/), print and cloud needs. [Want to work with us?](https://carriere.xefi.fr/metiers-software)
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
