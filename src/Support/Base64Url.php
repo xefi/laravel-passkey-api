@@ -2,7 +2,7 @@
 
 namespace Xefi\LaravelPasskey\Support;
 
-class Utils
+class Base64Url
 {
     /**
      * Convert base64url to standard base64 format.
@@ -13,7 +13,7 @@ class Utils
      * @param string $input Base64url-encoded string
      * @return string Standard base64-encoded string
      */
-    public static function convert_base64url_to_base64(string $input): string
+    public static function toBase64(string $input): string
     {
         return str_pad(
             strtr($input, '-_', '+/'),
@@ -32,7 +32,7 @@ class Utils
      * @param string $input Base64url-encoded string
      * @return string Decoded binary data
      */
-    public static function decode_base64_url(string $input): string
+    public static function decode(string $input): string
     {
         $input .= str_repeat('=', (4 - strlen($input) % 4) % 4);
         return base64_decode(strtr($input, '-_', '+/'), true);
@@ -46,7 +46,7 @@ class Utils
      * 
      * @return string Base64url-encoded challenge (no padding)
      */
-    public static function generate_challenge(): string
+    public static function generateChallenge(): string
     {
         $length = config('passkey.challenge_length', 32);
         return rtrim(strtr(base64_encode(random_bytes($length)), '+/', '-_'), '=');

@@ -41,7 +41,7 @@ class WebAuthnTest extends TestCase
         ];
 
         // Act
-        $options = $this->webAuthn->generate_verify_options($challenge, $credentialId);
+        $options = $this->webAuthn->generateVerifyOptions($challenge, $credentialId);
 
         // Assert
         $this->assertEquals($challenge, $options['challenge']);
@@ -65,7 +65,7 @@ class WebAuthnTest extends TestCase
         ];
 
         // Act
-        $this->webAuthn->validate_client_data($clientData, 'webauthn.create');
+        $this->webAuthn->validateClientData($clientData, 'webauthn.create');
 
         // Assert
         $this->assertTrue(true);
@@ -88,7 +88,7 @@ class WebAuthnTest extends TestCase
         $this->expectException(MalformedClientDataException::class);
 
         // Act
-        $this->webAuthn->validate_client_data($clientData, 'webauthn.create');
+        $this->webAuthn->validateClientData($clientData, 'webauthn.create');
     }
 
     /**
@@ -106,7 +106,7 @@ class WebAuthnTest extends TestCase
         $this->expectException(MalformedClientDataException::class);
 
         // Act
-        $this->webAuthn->validate_client_data($clientData, 'webauthn.create');
+        $this->webAuthn->validateClientData($clientData, 'webauthn.create');
     }
 
     /**
@@ -127,7 +127,7 @@ class WebAuthnTest extends TestCase
         $expected = 'dGVzdC1jaGFsbGVuZ2UtMTIz';
 
         // Act
-        $result = $this->webAuthn->get_challenge_from_client_data_json($clientDataJson);
+        $result = $this->webAuthn->getChallengeFromClientDataJson($clientDataJson);
 
         // Assert
         $this->assertEquals($expected, $result);
@@ -161,7 +161,7 @@ class WebAuthnTest extends TestCase
         ];
 
         // Act
-        $result = $this->webAuthn->parse_auth_data($authData);
+        $result = $this->webAuthn->parseAuthData($authData);
 
         // Assert
         $this->assertEquals($expected['rp_id_hash'], $result['rp_id_hash']);

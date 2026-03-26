@@ -23,8 +23,8 @@ class CreateSanctumTokenAction implements PasskeyAuthAction
         return response()->json([
             'user' => [
                 'id' => $user->id,
-                'name' => $user->name ?? null,
-                'email' => $user->email ?? null,
+                'name' => $user->getPasskeyDisplayName(),
+                'email' => $user->getPasskeyEmail(),
             ],
             'token' => $token,
         ]);

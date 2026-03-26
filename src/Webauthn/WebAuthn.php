@@ -2,7 +2,7 @@
 
 namespace Xefi\LaravelPasskey\Webauthn;
 
-use Xefi\LaravelPasskey\Support\Utils;
+use Xefi\LaravelPasskey\Support\Base64Url;
 use Xefi\LaravelPasskey\Models\Passkey;
 use Xefi\LaravelPasskey\Exceptions\InvalidCoseKeyException;
 use Xefi\LaravelPasskey\Exceptions\InvalidSignatureException;
@@ -10,6 +10,7 @@ use Xefi\LaravelPasskey\Exceptions\MalformedClientDataException;
 use Xefi\LaravelPasskey\Exceptions\MalformedAttestationException;
 use Xefi\LaravelPasskey\Exceptions\UnsupportedAlgorithmException;
 use Xefi\LaravelPasskey\Exceptions\InvalidAttestationFormatException;
+use Xefi\LaravelPasskey\Exceptions\PasskeyNotFoundException;
 
 /**
  * WebAuthn service for handling passkey operations.
@@ -67,14 +68,14 @@ final class WebAuthn
      * @param string $display_name User display name
      * @return array PublicKeyCredentialCreationOptions structure
      */
-    public function generate_register_options(
+    public function generateRegisterOptions(
         string $app_name,
         string $app_url,
         string $user_id,
         string $email,
         string $display_name
     ): array {
-        $challenge = Utils::generate_challenge();
+        $challenge = Base64Url::generateChallenge();
 
         return [
             'challenge' => $challenge,
@@ -116,7 +117,7 @@ final class WebAuthn
      * @param string $credential_id Base64-encoded credential identifier
      * @return array PublicKeyCredentialRequestOptions structure
      */
-    public function generate_verify_options(string $challenge, string $credential_id): array
+    public function generateVerifyOptions(string $challenge, string $credential_id): array
     {
         return [
             'challenge' => $challenge,
@@ -153,13 +154,17 @@ final class WebAuthn
      * @throws InvalidAttestationFormatException If attestation object is not a valid CBOR map
      * @throws MalformedAttestationException If attestation object is missing required fields
      */
-    public function get_data_for_register(string $client_data_json, string $attestation_object): array
+    public function getDataForRegister(string $client_data_json, string $attestation_object): array
     {
         $client_data = json_decode(base64_decode($client_data_json), true);
 
-        $this->validate_client_data($client_data, 'webauthn.create');
+        if (!is_array($client_data)) {
+            throw new MalformedClientDataException();
+        }
 
-        $attestation_raw = Utils::decode_base64_url($attestation_object);
+        $this->validateClientData($client_data, 'webauthn.create');
+
+        $attestation_raw = Base64Url::decode($attestation_object);
 
         // Use CBOR library to decode attestation object
         $stream = new \CBOR\StringStream($attestation_raw);
@@ -188,14 +193,12 @@ final class WebAuthn
             $auth_data = $auth_data->getValue();
         }
 
-        $parsed = $this->parse_auth_data($auth_data);
+        $parsed = $this->parseAuthData($auth_data);
 
-        $result = [
+        return [
             'credential_id' => base64_encode($parsed['credential_id']),
             'public_key' => base64_encode($parsed['public_key_cbor']),
         ];
-
-        return $result;
     }
 
     /**
@@ -232,11 +235,15 @@ final class WebAuthn
     ): void {
         $client_data = json_decode(base64_decode($client_data_json), true);
 
-        $this->validate_client_data($client_data, 'webauthn.get');
+        if (!is_array($client_data)) {
+            throw new MalformedClientDataException();
+        }
 
-        $auth_data = Utils::decode_base64_url($authenticator_data);
+        $this->validateClientData($client_data, 'webauthn.get');
 
-        $signature = Utils::decode_base64_url($signature);
+        $auth_data = Base64Url::decode($authenticator_data);
+
+        $signature = Base64Url::decode($signature);
 
         $client_data_hash = hash('sha256', base64_decode($client_data_json), true);
 
@@ -249,34 +256,6 @@ final class WebAuthn
         $stream = new \CBOR\StringStream($cose);
         $coseData = (new \CBOR\Decoder())->decode($stream);
 
-        // Helper function to convert CBOR objects to primitive values
-        $convertCborValue = function ($value) use (&$convertCborValue) {
-            if ($value instanceof \CBOR\ByteStringObject) {
-                return $value->getValue();
-            } elseif ($value instanceof \CBOR\NegativeIntegerObject) {
-                return $value->getValue();
-            } elseif ($value instanceof \CBOR\UnsignedIntegerObject) {
-                return $value->getValue();
-            } elseif ($value instanceof \CBOR\TextStringObject) {
-                return $value->getValue();
-            } elseif ($value instanceof \CBOR\MapObject) {
-                $result = [];
-                foreach ($value as $k => $v) {
-                    $result[$convertCborValue($k)] = $convertCborValue($v);
-                }
-                return $result;
-            } elseif ($value instanceof \CBOR\ListObject) {
-                $result = [];
-                foreach ($value as $v) {
-                    $result[] = $convertCborValue($v);
-                }
-                return $result;
-            } else {
-                // For primitives (int, string, etc.) or unknown types, return as-is
-                return $value;
-            }
-        };
-
         // Convert CBOR object to array for Cose\Key\Key
         if ($coseData instanceof \CBOR\MapObject) {
             $coseArray = [];
@@ -284,8 +263,8 @@ final class WebAuthn
             // MapObject iteration returns MapItem objects, not key-value pairs
             foreach ($coseData as $mapItem) {
                 if ($mapItem instanceof \CBOR\MapItem) {
-                    $key = $convertCborValue($mapItem->getKey());
-                    $value = $convertCborValue($mapItem->getValue());
+                    $key = $this->convertCborValue($mapItem->getKey());
+                    $value = $this->convertCborValue($mapItem->getValue());
                 } else {
                     continue;
                 }
@@ -330,7 +309,7 @@ final class WebAuthn
      * @return void
      * @throws MalformedClientDataException If client data is malformed or type doesn't match
      */
-    public function validate_client_data(array $client_data, string $expected_type): void
+    public function validateClientData(array $client_data, string $expected_type): void
     {
         if (!isset($client_data['type'], $client_data['challenge'], $client_data['origin'])) {
             throw new MalformedClientDataException();
@@ -358,7 +337,7 @@ final class WebAuthn
      * @param string $auth_data Binary authenticator data
      * @return array Parsed components: rp_id_hash, flags, sign_count, aaguid, credential_id, public_key_cbor
      */
-    public function parse_auth_data(string $auth_data): array
+    public function parseAuthData(string $auth_data): array
     {
         $offset = 0;
         $rp_id_hash = substr($auth_data, $offset, 32);
@@ -391,9 +370,14 @@ final class WebAuthn
      * @param string $client_data_json Base64url-encoded client data JSON
      * @return string Base64url-encoded challenge
      */
-    public function get_challenge_from_client_data_json(string $client_data_json): string
+    public function getChallengeFromClientDataJson(string $client_data_json): string
     {
         $client_data = json_decode(base64_decode($client_data_json), true);
+
+        if (!is_array($client_data)) {
+            throw new MalformedClientDataException();
+        }
+
         $challenge = base64_decode(strtr($client_data['challenge'], '-_', '+/'));
 
         return rtrim(strtr(base64_encode($challenge), '+/', '-_'), '=');
@@ -416,12 +400,12 @@ final class WebAuthn
     public function registerPasskey(array $validated, \Illuminate\Database\Eloquent\Model $owner): Passkey
     {
         // Extract challenge from clientDataJSON
-        $challenge = $this->get_challenge_from_client_data_json(
+        $challenge = $this->getChallengeFromClientDataJson(
             $validated['response']['clientDataJSON']
         );
 
         // Parse credential data
-        $parsed = $this->get_data_for_register(
+        $parsed = $this->getDataForRegister(
             $validated['response']['clientDataJSON'],
             $validated['response']['attestationObject']
         );
@@ -458,13 +442,13 @@ final class WebAuthn
         // Convert base64url to base64 standard for database lookup
         // The client sends base64url (- and _ chars, no padding)
         // But we store base64 standard (+ and / chars, with padding)
-        $credentialIdBase64 = Utils::convert_base64url_to_base64($credentialIdBase64Url);
+        $credentialIdBase64 = Base64Url::toBase64($credentialIdBase64Url);
 
         // Find the passkey by credential_id (base64 standard format)
         $passkey = Passkey::where('credential_id', $credentialIdBase64)->first();
 
         if (!$passkey) {
-            throw new \Exception('Passkey not found');
+            throw new PasskeyNotFoundException();
         }
 
         // Verify the signature using Webauthn
@@ -476,5 +460,40 @@ final class WebAuthn
         );
 
         return $passkey;
+    }
+
+    /**
+     * Recursively convert a CBOR value object to a primitive PHP value.
+     *
+     * @param mixed $value CBOR object or primitive
+     * @return mixed Primitive PHP value (string, int, array, etc.)
+     */
+    private function convertCborValue(mixed $value): mixed
+    {
+        if ($value instanceof \CBOR\ByteStringObject
+            || $value instanceof \CBOR\NegativeIntegerObject
+            || $value instanceof \CBOR\UnsignedIntegerObject
+            || $value instanceof \CBOR\TextStringObject
+        ) {
+            return $value->getValue();
+        }
+
+        if ($value instanceof \CBOR\MapObject) {
+            $result = [];
+            foreach ($value as $k => $v) {
+                $result[$this->convertCborValue($k)] = $this->convertCborValue($v);
+            }
+            return $result;
+        }
+
+        if ($value instanceof \CBOR\ListObject) {
+            $result = [];
+            foreach ($value as $v) {
+                $result[] = $this->convertCborValue($v);
+            }
+            return $result;
+        }
+
+        return $value;
     }
 }

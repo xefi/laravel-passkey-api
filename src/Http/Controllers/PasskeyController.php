@@ -6,7 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Illuminate\Auth\AuthenticationException;
 
-use Xefi\LaravelPasskey\Support\Utils;
+use Xefi\LaravelPasskey\Support\Base64Url;
 use Xefi\LaravelPasskey\Models\Passkey;
 use Xefi\LaravelPasskey\Webauthn\WebAuthn;
 use Xefi\LaravelPasskey\Http\Requests\IndexRequest;
@@ -103,7 +103,7 @@ class PasskeyController extends Controller
     {
         $validated = $request->validated();
 
-        $credentialIdBase64 = Utils::convert_base64url_to_base64($validated['credential_id']);
+        $credentialIdBase64 = Base64Url::toBase64($validated['credential_id']);
 
         $passkey = Passkey::query()->where('credential_id', $credentialIdBase64)->first();
 

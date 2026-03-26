@@ -14,8 +14,6 @@ class CreateSanctumTokenActionTest extends TestCase
     {
         return new class {
             public int $id = 1;
-            public string $name = 'Test User';
-            public string $email = 'test@example.com';
 
             public function createToken(string $name): object
             {
@@ -23,6 +21,9 @@ class CreateSanctumTokenActionTest extends TestCase
                     public string $plainTextToken = 'sanctum-token-123';
                 };
             }
+
+            public function getPasskeyDisplayName(): string { return 'Test User'; }
+            public function getPasskeyEmail(): string { return 'test@example.com'; }
         };
     }
 
@@ -44,13 +45,11 @@ class CreateSanctumTokenActionTest extends TestCase
         $this->assertEquals('sanctum-token-123', $data['token']);
     }
 
-    public function test_user_fields_are_nullable_in_response(): void
+    public function test_uses_trait_method_overrides_for_user_fields(): void
     {
-        // Arrange
+        // Arrange — user with custom display name (e.g. Admin with username field)
         $user = new class {
             public int $id = 2;
-            public ?string $name = null;
-            public ?string $email = null;
 
             public function createToken(string $name): object
             {
@@ -58,6 +57,9 @@ class CreateSanctumTokenActionTest extends TestCase
                     public string $plainTextToken = 'token-abc';
                 };
             }
+
+            public function getPasskeyDisplayName(): string { return 'admin_alice'; }
+            public function getPasskeyEmail(): string { return 'alice@admin.example.com'; }
         };
 
         $passkey = new Passkey();
@@ -69,9 +71,8 @@ class CreateSanctumTokenActionTest extends TestCase
 
         // Assert
         $data = $response->getData(true);
-        $this->assertNull($data['user']['name']);
-        $this->assertNull($data['user']['email']);
-        $this->assertEquals('token-abc', $data['token']);
+        $this->assertEquals('admin_alice', $data['user']['name']);
+        $this->assertEquals('alice@admin.example.com', $data['user']['email']);
     }
 
     public function test_throws_user_not_found_when_passkeeable_is_null(): void
