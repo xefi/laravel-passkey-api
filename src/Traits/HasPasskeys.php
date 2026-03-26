@@ -28,4 +28,26 @@ trait HasPasskeys
     {
         return $this->morphMany(Passkey::class, 'passkeeable');
     }
+
+    /**
+     * Get the display name to use for passkey registration.
+     * Override in your model to use a different field (e.g. username, display_name).
+     *
+     * @return string
+     */
+    public function getPasskeyDisplayName(): string
+    {
+        return $this->name ?? $this->email ?? (string) $this->getKey();
+    }
+
+    /**
+     * Get the email to use for passkey registration.
+     * Override in your model if the email field has a different name.
+     *
+     * @return string
+     */
+    public function getPasskeyEmail(): string
+    {
+        return $this->email ?? '';
+    }
 }

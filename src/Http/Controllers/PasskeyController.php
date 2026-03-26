@@ -12,7 +12,6 @@ use Xefi\LaravelPasskey\Webauthn\WebAuthn;
 use Xefi\LaravelPasskey\Http\Requests\IndexRequest;
 use Xefi\LaravelPasskey\Http\Requests\VerifyRequest;
 use Xefi\LaravelPasskey\Http\Requests\RegisterRequest;
-use Xefi\LaravelPasskey\Exceptions\UserNotFoundException;
 use Xefi\LaravelPasskey\Http\Requests\VerifyOptionsRequest;
 use Xefi\LaravelPasskey\Exceptions\PasskeyNotFoundException;
 use Xefi\LaravelPasskey\Http\Requests\RegisterOptionsRequest;
@@ -62,8 +61,8 @@ class PasskeyController extends Controller
             $validated['app_name'],
             $validated['app_url'],
             (string) $user->id,
-            $user->email,
-            $user->name
+            $user->getPasskeyEmail(),
+            $user->getPasskeyDisplayName()
         );
 
         return response()->json($options);
@@ -148,7 +147,11 @@ class PasskeyController extends Controller
     }
 
     /**
-     * Authenticate a model with a passkey and create a session (Sanctum token).
+     * Authenticate a model with a passkey.
+     *
+     * The response is determined by the configured PasskeyAuthAction, which
+     * defaults to creating a Sanctum token. Swap it via config('passkey.auth_action')
+     * to support sessions, Passport, or any other guard.
      *
      * @param VerifyRequest $request
      * @return JsonResponse
@@ -162,21 +165,6 @@ class PasskeyController extends Controller
             $validated['response']
         );
 
-        $user = $passkey->passkeeable;
-
-        if (!$user) {
-            throw new UserNotFoundException();
-        }
-
-        $token = $user->createToken('passkey-auth')->plainTextToken;
-
-        return response()->json([
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name ?? null,
-                'email' => $user->email ?? null,
-            ],
-            'token' => $token,
-        ]);
+        return app(\Xefi\LaravelPasskey\Contracts\PasskeyAuthAction::class)($passkey, $request);
     }
 }

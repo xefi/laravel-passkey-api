@@ -39,8 +39,5 @@
         }
     },
     "minimum-stability": "dev",
-    "prefer-stable": true,
-    "suggest": {
-        "laravel/sanctum": "Required for default token-based authentication session (^3.0|^4.0)."
-    }
+    "prefer-stable": true
 }
