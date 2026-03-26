@@ -57,7 +57,7 @@ class PasskeyController extends Controller
 
         $validated = $request->validated();
 
-        $options = $this->passkey->generate_register_options(
+        $options = $this->passkey->generateRegisterOptions(
             $validated['app_name'],
             $validated['app_url'],
             (string) $user->id,
