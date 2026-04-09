@@ -52,6 +52,7 @@ Key options in `config/passkey.php`:
 | `timeout` | `60000` | WebAuthn operation timeout (ms) |
 | `challenge_length` | `32` | Challenge size in bytes |
 | `user_model` | `App\Models\User` | Authenticatable model |
+| `session_guard` | `null` | Guard used by `CreateWebSessionAction` (falls back to Laravel default guard) |
 | `auth_action` | `CreateWebSessionAction` | Action invoked on successful login |
 
 ---

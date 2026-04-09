@@ -19,7 +19,9 @@ class CreateWebSessionAction implements PasskeyAuthAction
             throw new UserNotFoundException();
         }
 
-        Auth::login($user);
+        $guard = config('passkey.session_guard') ?: config('auth.defaults.guard', 'web');
+
+        Auth::guard($guard)->login($user);
 
         return response()->json([
             'user' => [

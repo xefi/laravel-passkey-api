@@ -18,6 +18,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Session Guard
+    |--------------------------------------------------------------------------
+    |
+    | Guard used by CreateWebSessionAction when creating a login session.
+    | Set this when your passkey login flow should authenticate on a non-default
+    | guard (for example: 'admin').
+    |
+    | If null, the Laravel default auth guard is used.
+    |
+    */
+
+    'session_guard' => env('PASSKEY_SESSION_GUARD', null),
+
+    /*
+    |--------------------------------------------------------------------------
     | Middleware Configuration
     |--------------------------------------------------------------------------
     |
@@ -55,8 +70,8 @@ return [
     |   CreatePassportTokenAction — Returns a Laravel Passport access token
     |                               with expiry. Requires laravel/passport.
     |
-    |   CreateWebSessionAction    — Logs the user into the default web guard
-    |                               and returns user data without a token.
+    |   CreateWebSessionAction    — Logs the user into the configured session
+    |                               guard and returns user data without a token.
     |                               Use with session-based authentication. (default)
     |
     | You can also provide your own class to support custom guards or any

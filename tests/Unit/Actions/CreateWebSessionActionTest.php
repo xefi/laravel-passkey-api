@@ -64,6 +64,26 @@ class CreateWebSessionActionTest extends TestCase
         $this->assertSame($user, Auth::user());
     }
 
+    public function test_logs_in_using_configured_session_guard(): void
+    {
+        // Arrange
+        $user = $this->makeUser();
+        $passkey = new Passkey();
+        $passkey->setRelation('passkeeable', $user);
+        $request = Request::create('/api/passkeys/login', 'POST');
+
+        config([
+            'auth.defaults.guard' => 'undefined_guard',
+            'passkey.session_guard' => 'web',
+        ]);
+
+        // Act
+        (new CreateWebSessionAction())($passkey, $request);
+
+        // Assert
+        $this->assertSame($user, Auth::guard('web')->user());
+    }
+
     public function test_throws_user_not_found_when_passkeeable_is_null(): void
     {
         // Arrange
