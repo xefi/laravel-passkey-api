@@ -50,14 +50,14 @@ return [
     | Built-in actions:
     |
     |   CreateSanctumTokenAction  — Returns a Laravel Sanctum personal access
-    |                               token. Requires laravel/sanctum. (default)
+    |                               token. Requires laravel/sanctum.
     |
     |   CreatePassportTokenAction — Returns a Laravel Passport access token
     |                               with expiry. Requires laravel/passport.
     |
     |   CreateWebSessionAction    — Logs the user into the default web guard
     |                               and returns user data without a token.
-    |                               Use with session-based authentication.
+    |                               Use with session-based authentication. (default)
     |
     | You can also provide your own class to support custom guards or any
     | other authentication mechanism.

@@ -150,8 +150,8 @@ class PasskeyController extends Controller
      * Authenticate a model with a passkey.
      *
      * The response is determined by the configured PasskeyAuthAction, which
-     * defaults to creating a Sanctum token. Swap it via config('passkey.auth_action')
-     * to support sessions, Passport, or any other guard.
+     * defaults to creating a web session. Swap it via config('passkey.auth_action')
+     * to support Sanctum, Passport, or any other guard.
      *
      * @param VerifyRequest $request
      * @return JsonResponse
