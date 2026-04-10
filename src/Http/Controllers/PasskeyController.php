@@ -6,13 +6,12 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Illuminate\Auth\AuthenticationException;
 
-use Xefi\LaravelPasskey\Support\Utils;
+use Xefi\LaravelPasskey\Support\Base64Url;
 use Xefi\LaravelPasskey\Models\Passkey;
 use Xefi\LaravelPasskey\Webauthn\WebAuthn;
 use Xefi\LaravelPasskey\Http\Requests\IndexRequest;
 use Xefi\LaravelPasskey\Http\Requests\VerifyRequest;
 use Xefi\LaravelPasskey\Http\Requests\RegisterRequest;
-use Xefi\LaravelPasskey\Exceptions\UserNotFoundException;
 use Xefi\LaravelPasskey\Http\Requests\VerifyOptionsRequest;
 use Xefi\LaravelPasskey\Exceptions\PasskeyNotFoundException;
 use Xefi\LaravelPasskey\Http\Requests\RegisterOptionsRequest;
@@ -58,12 +57,12 @@ class PasskeyController extends Controller
 
         $validated = $request->validated();
 
-        $options = $this->passkey->generate_register_options(
+        $options = $this->passkey->generateRegisterOptions(
             $validated['app_name'],
             $validated['app_url'],
             (string) $user->id,
-            $user->email,
-            $user->name
+            $user->getPasskeyEmail(),
+            $user->getPasskeyDisplayName()
         );
 
         return response()->json($options);
@@ -104,7 +103,7 @@ class PasskeyController extends Controller
     {
         $validated = $request->validated();
 
-        $credentialIdBase64 = Utils::convert_base64url_to_base64($validated['credential_id']);
+        $credentialIdBase64 = Base64Url::toBase64($validated['credential_id']);
 
         $passkey = Passkey::query()->where('credential_id', $credentialIdBase64)->first();
 
@@ -148,7 +147,11 @@ class PasskeyController extends Controller
     }
 
     /**
-     * Authenticate a model with a passkey and create a session (Sanctum token).
+     * Authenticate a model with a passkey.
+     *
+     * The response is determined by the configured PasskeyAuthAction, which
+     * defaults to creating a web session. Swap it via config('passkey.auth_action')
+     * to support Sanctum, Passport, or any other guard.
      *
      * @param VerifyRequest $request
      * @return JsonResponse
@@ -162,21 +165,6 @@ class PasskeyController extends Controller
             $validated['response']
         );
 
-        $user = $passkey->passkeeable;
-
-        if (!$user) {
-            throw new UserNotFoundException();
-        }
-
-        $token = $user->createToken('passkey-auth')->plainTextToken;
-
-        return response()->json([
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name ?? null,
-                'email' => $user->email ?? null,
-            ],
-            'token' => $token,
-        ]);
+        return app(\Xefi\LaravelPasskey\Contracts\PasskeyAuthAction::class)($passkey, $request);
     }
 }

@@ -15,6 +15,11 @@ class PasskeyServiceProvider extends ServiceProvider
             __DIR__ . '/../config/passkey.php',
             'passkey'
         );
+
+        $this->app->bind(
+            \Xefi\LaravelPasskey\Contracts\PasskeyAuthAction::class,
+            config('passkey.auth_action', \Xefi\LaravelPasskey\Actions\CreateWebSessionAction::class)
+        );
     }
 
     /**

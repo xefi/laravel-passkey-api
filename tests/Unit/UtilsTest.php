@@ -4,7 +4,7 @@ namespace Xefi\LaravelPasskey\Tests\Unit\Support;
 
 use Xefi\LaravelPasskey\Tests\TestCase;
 
-use Xefi\LaravelPasskey\Support\Utils;
+use Xefi\LaravelPasskey\Support\Base64Url;
 
 class UtilsTest extends TestCase
 {
@@ -20,7 +20,7 @@ class UtilsTest extends TestCase
         $expected = 'a+b/c===';
 
         // Act
-        $result = Utils::convert_base64url_to_base64($base64url);
+        $result = Base64Url::toBase64($base64url);
 
         // Assert
         $this->assertEquals($expected, $result);
@@ -38,7 +38,7 @@ class UtilsTest extends TestCase
         $expected = 'hello world';
 
         // Act
-        $result = Utils::decode_base64_url($base64url);
+        $result = Base64Url::decode($base64url);
 
         // Assert
         $this->assertEquals($expected, $result);
@@ -55,7 +55,7 @@ class UtilsTest extends TestCase
         config(['passkey.challenge_length' => 32]);
 
         // Act
-        $challenge = Utils::generate_challenge();
+        $challenge = Base64Url::generateChallenge();
 
         // Assert
         $this->assertEquals(43, strlen($challenge));

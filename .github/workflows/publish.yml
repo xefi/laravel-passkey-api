@@ -1,0 +1,19 @@
+name: Packagist Deploy
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mnavarrocarter/packagist-update@v1.0.0
+        with:
+          username: "GautierDele"
+          api_token: ${{ secrets.PACKAGIST_TOKEN }}

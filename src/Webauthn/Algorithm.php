@@ -57,8 +57,12 @@ enum Algorithm: int
      */
     private function buildEs256Pem(\Cose\Key\Key $coseKey): array
     {
-        $x = $coseKey->get(-2); // x coordinate
-        $y = $coseKey->get(-3); // y coordinate
+        try {
+            $x = $coseKey->get(-2); // x coordinate
+            $y = $coseKey->get(-3); // y coordinate
+        } catch (\InvalidArgumentException) {
+            throw new MissingEcCoordinatesException();
+        }
 
         if (!$x || !$y) {
             throw new MissingEcCoordinatesException();
@@ -94,8 +98,12 @@ enum Algorithm: int
      */
     private function buildRs256Pem(\Cose\Key\Key $coseKey): array
     {
-        $n = $coseKey->get(-1); // modulus
-        $e = $coseKey->get(-2); // exponent
+        try {
+            $n = $coseKey->get(-1); // modulus
+            $e = $coseKey->get(-2); // exponent
+        } catch (\InvalidArgumentException) {
+            throw new MissingRsaParametersException();
+        }
 
         if (!$n || !$e) {
             throw new MissingRsaParametersException();
