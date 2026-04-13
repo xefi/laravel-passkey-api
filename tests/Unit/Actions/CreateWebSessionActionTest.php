@@ -2,13 +2,14 @@
 
 namespace Xefi\LaravelPasskey\Tests\Unit\Actions;
 
-use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Xefi\LaravelPasskey\Actions\CreateWebSessionAction;
-use Xefi\LaravelPasskey\Exceptions\UserNotFoundException;
+use Illuminate\Contracts\Auth\Authenticatable;
+
 use Xefi\LaravelPasskey\Models\Passkey;
 use Xefi\LaravelPasskey\Tests\TestCase;
+use Xefi\LaravelPasskey\Actions\CreateWebSessionAction;
+use Xefi\LaravelPasskey\Exceptions\UserNotFoundException;
 
 class CreateWebSessionActionTest extends TestCase
 {
@@ -28,6 +29,7 @@ class CreateWebSessionActionTest extends TestCase
             public function getRememberTokenName(): string { return 'remember_token'; }
             public function getPasskeyDisplayName(): string { return $this->name; }
             public function getPasskeyEmail(): string { return $this->email; }
+            public function getKey(): mixed { return $this->id; }
         };
     }
 

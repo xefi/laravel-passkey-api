@@ -6,9 +6,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Illuminate\Auth\AuthenticationException;
 
-use Xefi\LaravelPasskey\Support\Base64Url;
 use Xefi\LaravelPasskey\Models\Passkey;
 use Xefi\LaravelPasskey\Webauthn\WebAuthn;
+use Xefi\LaravelPasskey\Support\Base64Url;
 use Xefi\LaravelPasskey\Http\Requests\IndexRequest;
 use Xefi\LaravelPasskey\Http\Requests\VerifyRequest;
 use Xefi\LaravelPasskey\Http\Requests\RegisterRequest;
@@ -60,7 +60,7 @@ class PasskeyController extends Controller
         $options = $this->passkey->generateRegisterOptions(
             $validated['app_name'],
             $validated['app_url'],
-            (string) $user->id,
+            (string) $user->getKey(),
             $user->getPasskeyEmail(),
             $user->getPasskeyDisplayName()
         );

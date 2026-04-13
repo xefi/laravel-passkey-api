@@ -2,12 +2,12 @@
 
 namespace Xefi\LaravelPasskey\Tests\Unit\Actions;
 
-use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Xefi\LaravelPasskey\Actions\CreatePassportTokenAction;
-use Xefi\LaravelPasskey\Exceptions\UserNotFoundException;
+
 use Xefi\LaravelPasskey\Models\Passkey;
 use Xefi\LaravelPasskey\Tests\TestCase;
+use Xefi\LaravelPasskey\Exceptions\UserNotFoundException;
+use Xefi\LaravelPasskey\Actions\CreatePassportTokenAction;
 
 class CreatePassportTokenActionTest extends TestCase
 {
@@ -42,6 +42,7 @@ class CreatePassportTokenActionTest extends TestCase
 
             public function getPasskeyDisplayName(): string { return $this->name; }
             public function getPasskeyEmail(): string { return $this->email; }
+            public function getKey(): mixed { return $this->id; }
         };
     }
 

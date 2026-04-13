@@ -2,15 +2,15 @@
 
 namespace Xefi\LaravelPasskey\Webauthn;
 
-use Xefi\LaravelPasskey\Support\Base64Url;
 use Xefi\LaravelPasskey\Models\Passkey;
+use Xefi\LaravelPasskey\Support\Base64Url;
 use Xefi\LaravelPasskey\Exceptions\InvalidCoseKeyException;
+use Xefi\LaravelPasskey\Exceptions\PasskeyNotFoundException;
 use Xefi\LaravelPasskey\Exceptions\InvalidSignatureException;
 use Xefi\LaravelPasskey\Exceptions\MalformedClientDataException;
 use Xefi\LaravelPasskey\Exceptions\MalformedAttestationException;
 use Xefi\LaravelPasskey\Exceptions\UnsupportedAlgorithmException;
 use Xefi\LaravelPasskey\Exceptions\InvalidAttestationFormatException;
-use Xefi\LaravelPasskey\Exceptions\PasskeyNotFoundException;
 
 /**
  * WebAuthn service for handling passkey operations.
@@ -84,7 +84,7 @@ final class WebAuthn
                 'id' => parse_url($app_url, PHP_URL_HOST),
             ],
             'user' => [
-                'id' => base64_encode(pack('N', intval($user_id))),
+                'id' => Base64Url::encode($user_id),
                 'name' => $email,
                 'displayName' => $display_name,
             ],

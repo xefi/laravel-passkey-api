@@ -49,6 +49,17 @@ class Base64Url
     public static function generateChallenge(): string
     {
         $length = config('passkey.challenge_length', 32);
-        return rtrim(strtr(base64_encode(random_bytes($length)), '+/', '-_'), '=');
+        return self::encode(random_bytes($length));
+    }
+
+    /**
+     * Encode binary data to base64url format.
+     *
+     * @param string $input Binary data
+     * @return string Base64url-encoded string (no padding)
+     */
+    public static function encode(string $input): string
+    {
+        return rtrim(strtr(base64_encode($input), '+/', '-_'), '=');
     }
 }

@@ -2,12 +2,13 @@
 
 namespace Xefi\LaravelPasskey\Actions;
 
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+
+use Xefi\LaravelPasskey\Models\Passkey;
 use Xefi\LaravelPasskey\Contracts\PasskeyAuthAction;
 use Xefi\LaravelPasskey\Exceptions\UserNotFoundException;
-use Xefi\LaravelPasskey\Models\Passkey;
 
 class CreateWebSessionAction implements PasskeyAuthAction
 {
@@ -25,7 +26,7 @@ class CreateWebSessionAction implements PasskeyAuthAction
 
         return response()->json([
             'user' => [
-                'id' => $user->id,
+                'id' => $user->getKey(),
                 'name' => $user->getPasskeyDisplayName(),
                 'email' => $user->getPasskeyEmail(),
             ],

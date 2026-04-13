@@ -3,10 +3,11 @@
 namespace Xefi\LaravelPasskey\Tests\Unit\Actions;
 
 use Illuminate\Http\Request;
-use Xefi\LaravelPasskey\Actions\CreateSanctumTokenAction;
-use Xefi\LaravelPasskey\Exceptions\UserNotFoundException;
+
 use Xefi\LaravelPasskey\Models\Passkey;
 use Xefi\LaravelPasskey\Tests\TestCase;
+use Xefi\LaravelPasskey\Actions\CreateSanctumTokenAction;
+use Xefi\LaravelPasskey\Exceptions\UserNotFoundException;
 
 class CreateSanctumTokenActionTest extends TestCase
 {
@@ -24,6 +25,7 @@ class CreateSanctumTokenActionTest extends TestCase
 
             public function getPasskeyDisplayName(): string { return 'Test User'; }
             public function getPasskeyEmail(): string { return 'test@example.com'; }
+            public function getKey(): mixed { return $this->id; }
         };
     }
 
@@ -60,6 +62,7 @@ class CreateSanctumTokenActionTest extends TestCase
 
             public function getPasskeyDisplayName(): string { return 'admin_alice'; }
             public function getPasskeyEmail(): string { return 'alice@admin.example.com'; }
+            public function getKey(): mixed { return $this->id; }
         };
 
         $passkey = new Passkey();
